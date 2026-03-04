@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/home.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/profile.dart';
-import 'package:salah_mode/screens/home_bottom_navbar/qibla.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/tools/tools.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tasbih.dart';
 
 class SalahMainScreen extends StatefulWidget {
@@ -14,12 +14,12 @@ class SalahMainScreen extends StatefulWidget {
 class _SalahMainScreenState extends State<SalahMainScreen> {
   int currentIndex = 0;
 
-  final pages = const [HomePage(), TasbihPage(), QiblaPage(), ProfilePage()];
+  final pages = const [HomePage(), TasbihPage(), ToolsScreen(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: pages[currentIndex],
       bottomNavigationBar: _bottomBar(),
     );
@@ -31,9 +31,11 @@ class _SalahMainScreenState extends State<SalahMainScreen> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.08),
+        color: Theme.of(context).colorScheme.surface.withOpacity(.2),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(.2),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -56,13 +58,21 @@ class _SalahMainScreenState extends State<SalahMainScreen> {
         children: [
           Icon(
             icon,
-            color: selected ? const Color(0xFF00E676) : Colors.white54,
+            color: selected
+                ? Colors.green
+                : Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.color?.withOpacity(.6),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: selected ? const Color(0xFF00E676) : Colors.white54,
+              color: selected
+                  ? Colors.green
+                  : Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.color?.withOpacity(.6),
               fontSize: 12,
             ),
           ),

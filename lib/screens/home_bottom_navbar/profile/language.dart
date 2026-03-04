@@ -20,15 +20,18 @@ class _LanguageScreenState extends State<LanguageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onBackground,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           "Language",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onBackground,
+          ),
         ),
       ),
       body: Padding(
@@ -36,9 +39,14 @@ class _LanguageScreenState extends State<LanguageScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Choose your preferred language",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(.7),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 20),
             Expanded(
@@ -84,12 +92,12 @@ class _LanguageScreenState extends State<LanguageScreen> {
         decoration: BoxDecoration(
           color: selected
               ? Theme.of(context).colorScheme.primary.withOpacity(.18)
-              : Colors.white.withOpacity(.04),
+              : Theme.of(context).colorScheme.surface.withOpacity(.6),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.white.withOpacity(.08),
+                : Theme.of(context).dividerColor.withOpacity(.4),
             width: selected ? 1.6 : 1,
           ),
           boxShadow: selected
@@ -106,7 +114,11 @@ class _LanguageScreenState extends State<LanguageScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.language, color: Colors.white70, size: 26),
+            Icon(
+              Icons.language,
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(.7),
+              size: 26,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -114,8 +126,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onBackground,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -123,7 +135,12 @@ class _LanguageScreenState extends State<LanguageScreen> {
                   const SizedBox(height: 2),
                   Text(
                     native,
-                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onBackground.withOpacity(.6),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),

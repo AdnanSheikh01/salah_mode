@@ -80,17 +80,18 @@ class ContactFormPage extends StatelessWidget {
 
   final ContactFormController controller = Get.put(ContactFormController());
 
-  static const Color mainBg = Color(0xFF0F2027);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: mainBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        foregroundColor: Colors.white,
-        title: const Text(
+        foregroundColor: Theme.of(context).colorScheme.onBackground,
+        title: Text(
           "Contact Us",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onBackground,
+          ),
         ),
         backgroundColor: Colors.transparent,
         centerTitle: true,
@@ -104,12 +105,12 @@ class ContactFormPage extends StatelessWidget {
               const SizedBox(height: 10),
 
               /// Title
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   "We'd love to hear from you",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onBackground,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -156,19 +157,21 @@ class ContactFormPage extends StatelessWidget {
                         ? null
                         : controller.submitForm,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.tealAccent.shade700,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     child: controller.isLoading.value
-                        ? const CircularProgressIndicator(color: Colors.black)
-                        : const Text(
+                        ? CircularProgressIndicator(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          )
+                        : Text(
                             "Send Message",
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                   ),
@@ -190,17 +193,26 @@ class ContactFormPage extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF203A43),
+        color: Theme.of(Get.context!).colorScheme.surface.withOpacity(.6),
         borderRadius: BorderRadius.circular(14),
       ),
       child: TextField(
         controller: controller,
         maxLines: maxLines,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(
+          color: Theme.of(Get.context!).colorScheme.onBackground,
+        ),
         decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: Colors.tealAccent),
+          prefixIcon: Icon(
+            icon,
+            color: Theme.of(Get.context!).colorScheme.primary,
+          ),
           hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white54),
+          hintStyle: TextStyle(
+            color: Theme.of(
+              Get.context!,
+            ).colorScheme.onBackground.withOpacity(.6),
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,

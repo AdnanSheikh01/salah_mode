@@ -1,28 +1,24 @@
 import 'package:flutter/material.dart';
 
 class SelectionThemePage extends StatelessWidget {
-  const SelectionThemePage({super.key});
+  final ThemeMode currentMode;
+  final ValueChanged<ThemeMode> onChanged;
 
-  ThemeMode _getThemeMode(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    // This is only for UI highlight; replace with your real controller later
-    if (brightness == Brightness.dark) {
-      return ThemeMode.dark;
-    }
-    return ThemeMode.light;
-  }
+  const SelectionThemePage({
+    super.key,
+    required this.currentMode,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final currentMode = _getThemeMode(context);
-
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        title: const Text(
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        title: Text(
           "Select Theme",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -33,9 +29,12 @@ class SelectionThemePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Choose your appearance",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(.7),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 20),
             _themeCard(
@@ -43,9 +42,7 @@ class SelectionThemePage extends StatelessWidget {
               title: "System Default",
               icon: Icons.phone_android,
               selected: currentMode == ThemeMode.system,
-              onTap: () {
-                // TODO: connect with your theme controller
-              },
+              onTap: () => onChanged(ThemeMode.system),
             ),
             const SizedBox(height: 16),
             _themeCard(
@@ -53,9 +50,7 @@ class SelectionThemePage extends StatelessWidget {
               title: "Light Theme",
               icon: Icons.light_mode,
               selected: currentMode == ThemeMode.light,
-              onTap: () {
-                // TODO: connect with your theme controller
-              },
+              onTap: () => onChanged(ThemeMode.light),
             ),
             const SizedBox(height: 16),
             _themeCard(
@@ -63,9 +58,7 @@ class SelectionThemePage extends StatelessWidget {
               title: "Dark Theme",
               icon: Icons.dark_mode,
               selected: currentMode == ThemeMode.dark,
-              onTap: () {
-                // TODO: connect with your theme controller
-              },
+              onTap: () => onChanged(ThemeMode.dark),
             ),
           ],
         ),
@@ -88,12 +81,12 @@ class SelectionThemePage extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? Theme.of(context).colorScheme.primary.withOpacity(.18)
-              : Colors.white.withOpacity(.04),
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.white.withOpacity(.08),
+                : Theme.of(context).colorScheme.outline.withOpacity(.3),
             width: selected ? 1.6 : 1,
           ),
           boxShadow: selected
@@ -115,15 +108,15 @@ class SelectionThemePage extends StatelessWidget {
               size: 28,
               color: selected
                   ? Theme.of(context).colorScheme.primary
-                  : Colors.white70,
+                  : Theme.of(context).colorScheme.onSurface.withOpacity(.7),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),

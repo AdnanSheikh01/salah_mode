@@ -1,4 +1,4 @@
-import 'package:adhan_dart/adhan_dart.dart';
+import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 
 class MadhabSelectionScreen extends StatefulWidget {
@@ -27,15 +27,18 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onBackground,
         elevation: 0,
         backgroundColor: Colors.transparent,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           "Select Madhab",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onBackground,
+          ),
         ),
       ),
       body: Padding(
@@ -43,9 +46,14 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Choose your juristic method for prayer times",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onBackground.withOpacity(.7),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -81,11 +89,11 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
                   widget.onChanged?.call(_selected);
                   Navigator.pop(context);
                 },
-                child: const Text(
+                child: Text(
                   "Save",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
               ),
@@ -114,12 +122,12 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
         decoration: BoxDecoration(
           color: selected
               ? Theme.of(context).colorScheme.primary.withOpacity(.18)
-              : Colors.white.withOpacity(.04),
+              : Theme.of(context).colorScheme.surface.withOpacity(.6),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.white.withOpacity(.08),
+                : Theme.of(context).dividerColor.withOpacity(.4),
             width: selected ? 1.6 : 1,
           ),
           boxShadow: selected
@@ -136,7 +144,10 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.menu_book_rounded, color: Colors.white70),
+            Icon(
+              Icons.menu_book_rounded,
+              color: Theme.of(context).colorScheme.onBackground.withOpacity(.7),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -144,8 +155,8 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onBackground,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -153,7 +164,12 @@ class _MadhabSelectionScreenState extends State<MadhabSelectionScreen> {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onBackground.withOpacity(.6),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
