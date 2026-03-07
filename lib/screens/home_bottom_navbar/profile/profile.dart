@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/contactform.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/profile/donation.dart';
 import 'package:salah_mode/screens/utils/about_us.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -149,7 +150,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
                   onTap: () {
-                    // TODO: add support link / donation page
+                    Get.to(() => const DonationScreen());
                   },
                   child: Row(
                     children: [

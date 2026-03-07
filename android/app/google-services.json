@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "526394807998",
+    "project_id": "salah-mode-c3142",
+    "storage_bucket": "salah-mode-c3142.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:526394807998:android:fdfccf508b8c1fbb8b70ef",
+        "android_client_info": {
+          "package_name": "com.example.salah_mode"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrOET_S_PGBsMZQoj-Ykei221lDmB94ck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

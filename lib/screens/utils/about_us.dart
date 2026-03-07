@@ -30,8 +30,8 @@ class AboutUsPage extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            RichText(
-              text: TextSpan(
+            Text.rich(
+              TextSpan(
                 style: Theme.of(context).textTheme.bodyMedium,
                 children: _buildFormattedText(context),
               ),
@@ -44,7 +44,7 @@ class AboutUsPage extends StatelessWidget {
 
   List<TextSpan> _buildFormattedText(BuildContext context) {
     final baseStyle = Theme.of(context).textTheme.bodyMedium!;
-    final boldStyle = baseStyle.copyWith(fontWeight: FontWeight.bold);
+    final boldStyle = baseStyle.copyWith(fontWeight: FontWeight.w700);
     final italicStyle = baseStyle.copyWith(fontStyle: FontStyle.italic);
 
     return [

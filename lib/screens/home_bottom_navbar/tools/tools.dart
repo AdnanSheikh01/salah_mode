@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/tools/daily_dhikr.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tools/daily_hadith.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tools/islamic_calender.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/tools/nearby_mosque.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tools/ninty_nine_names.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/tools/prayer_guide.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tools/prayer_times.dart';
 
 import 'package:salah_mode/screens/home_bottom_navbar/tools/qibla_finder.dart';
@@ -60,6 +63,13 @@ class _ToolsScreenState extends State<ToolsScreen> {
       category: "Quran",
     ),
     _ToolItem(
+      icon: Icons.person,
+      title: "Prayer Guide",
+      subtitle: "Prayer Tips and Techniques",
+      badge: "NEW",
+      category: "Prayer Guide",
+    ),
+    _ToolItem(
       icon: Icons.auto_stories,
       title: "Daily Hadith",
       subtitle: "Get authentic hadith daily",
@@ -67,7 +77,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
     ),
     _ToolItem(
       icon: Icons.mosque,
-      title: "Nearby Mosque",
+      title: "Nearby Mosques",
       subtitle: "Find mosques near you",
       badge: "NEW",
       category: "Utility",
@@ -207,7 +217,9 @@ class _ToolsScreenState extends State<ToolsScreen> {
                     subtitle: tool.subtitle,
                     badge: tool.badge,
                     onTap: () {
-                      if (tool.title == "Qibla Finder") {
+                      if (tool.title == "Daily Dhikr") {
+                        _openDailyDhikr();
+                      } else if (tool.title == "Qibla Finder") {
                         _openQiblaFinder();
                       } else if (tool.title == "Quran") {
                         _openQuranPage();
@@ -219,6 +231,10 @@ class _ToolsScreenState extends State<ToolsScreen> {
                         _openNintyNineNamesPage();
                       } else if (tool.title == "Daily Hadith") {
                         _opendailyHadith();
+                      } else if (tool.title == "Nearby Mosques") {
+                        _openNearbyMosques();
+                      } else if (tool.title == "Prayer Guide") {
+                        _openPrayerGuide();
                       } else {
                         _comingSoon();
                       }
@@ -398,6 +414,18 @@ class _ToolsScreenState extends State<ToolsScreen> {
 
   void _openNintyNineNamesPage() {
     Get.to(() => const NinetyNineNamesScreen());
+  }
+
+  void _openDailyDhikr() {
+    Get.to(() => const DailyDhikrScreen());
+  }
+
+  void _openNearbyMosques() {
+    Get.to(() => const NearbyMosqueScreen());
+  }
+
+  void _openPrayerGuide() {
+    Get.to(() => const PrayerGuideScreen());
   }
 
   void _openSmartCompanion() {

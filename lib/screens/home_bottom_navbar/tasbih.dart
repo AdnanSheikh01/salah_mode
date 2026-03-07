@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:get/get.dart';
 
 class TasbihPage extends StatefulWidget {
   const TasbihPage({super.key});
@@ -26,6 +27,11 @@ class _TasbihPageState extends State<TasbihPage> {
   Map<String, int> tasbihTargets = {};
 
   String selectedTasbih = 'Subhanallah';
+
+  bool guidedMode = false;
+  String? guidedTasbih;
+  int? guidedTarget;
+
   int target = 33;
 
   final AudioPlayer _player = AudioPlayer();
@@ -45,10 +51,11 @@ class _TasbihPageState extends State<TasbihPage> {
     setState(() {
       final current = tasbihCounts[selectedTasbih] ?? 0;
 
-      // Allahu Akbar has target 34
-      final int localTarget = selectedTasbih == 'Allahu Akbar'
-          ? 34
-          : (tasbihTargets[selectedTasbih] ?? target);
+      final int localTarget = guidedMode
+          ? (guidedTarget ?? target)
+          : (selectedTasbih == 'Allahu Akbar'
+                ? 34
+                : (tasbihTargets[selectedTasbih] ?? target));
 
       final next = current + 1;
       tasbihCounts[selectedTasbih] = next;
@@ -61,13 +68,23 @@ class _TasbihPageState extends State<TasbihPage> {
 
       // Auto reset after limit
       if (next >= localTarget) {
-        Future.delayed(const Duration(milliseconds: 120), () {
-          if (mounted) {
-            setState(() {
-              tasbihCounts[selectedTasbih] = 0;
-            });
-          }
-        });
+        if (guidedMode) {
+          /// return to Daily Dhikr page
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (mounted) {
+              Get.back(result: true);
+            }
+          });
+        } else {
+          /// normal free tasbih behaviour
+          Future.delayed(const Duration(milliseconds: 120), () {
+            if (mounted) {
+              setState(() {
+                tasbihCounts[selectedTasbih] = 0;
+              });
+            }
+          });
+        }
       }
     });
 
@@ -81,6 +98,24 @@ class _TasbihPageState extends State<TasbihPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+
+    /// If opened from Daily Dhikr page
+    final args = Get.arguments;
+
+    if (args != null && args is Map) {
+      guidedMode = args['guided'] == true;
+      guidedTasbih = args['tasbih'];
+      guidedTarget = args['target'];
+
+      if (guidedMode && guidedTasbih != null) {
+        selectedTasbih = guidedTasbih!;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final currentCount = tasbihCounts[selectedTasbih] ?? 0;
     final int displayTarget = selectedTasbih == 'Allahu Akbar'
@@ -90,21 +125,43 @@ class _TasbihPageState extends State<TasbihPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: guidedMode
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (guidedMode) {
+                    Get.snackbar(
+                      "Complete Dhikr",
+                      "Please complete the tasbih before leaving.",
+                      margin: const EdgeInsets.all(12),
+                      borderRadius: 10,
+                      backgroundColor: Colors.orange,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 2),
+                    );
+                  } else {
+                    Get.back();
+                  }
+                },
+              )
+            : null,
+
+        /// 🕌 Title
+        title: Text(
+          "Digital Tasbih",
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 20),
-
-            /// 🕌 Title
-            Text(
-              "Digital Tasbih",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
             const SizedBox(height: 20),
 
             /// 📿 Tasbih Selector
@@ -119,7 +176,19 @@ class _TasbihPageState extends State<TasbihPage> {
 
                   return GestureDetector(
                     onTap: () async {
-                      // Add new custom tasbih
+                      /// 🚫 Block changing tasbih in guided mode
+                      if (guidedMode) {
+                        Get.snackbar(
+                          "Locked Tasbih",
+                          "Please complete the current dhikr first.",
+                          margin: const EdgeInsets.all(12),
+                          borderRadius: 10,
+                          backgroundColor: Colors.orange,
+                          colorText: Colors.white,
+                          duration: const Duration(seconds: 2),
+                        );
+                        return;
+                      }
                       if (name == '+ Custom') {
                         final nameController = TextEditingController();
                         final targetController = TextEditingController();

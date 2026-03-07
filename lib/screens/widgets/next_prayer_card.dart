@@ -1,177 +1,215 @@
+import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-Widget nextPrayerCard(
+Widget premiumNextPrayerHeader(
   BuildContext context,
   DateTime nextPrayerTime,
   Duration remaining,
-  String nextPrayerName,
-  String cityName,
+  String prayerName,
+  String city,
+  PrayerTimes? prayerTimes,
 ) {
-  final formattedTime = formatTime(nextPrayerTime);
-  final remainingText = remaining.inSeconds <= 0
-      ? "--:--:--"
-      : _formatDuration(remaining);
+  final theme = Theme.of(context);
 
-  return Container(
-    padding: const EdgeInsets.all(22),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(28),
-      gradient: const LinearGradient(
-        colors: [Color(0xFF00E676), Color(0xFF00C853), Color(0xFF009624)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF00E676).withOpacity(0.35),
-          blurRadius: 28,
-          spreadRadius: 2,
-          offset: const Offset(0, 14),
-        ),
-      ],
-    ),
-    child: Stack(
-      children: [
-        // subtle glow circle
-        Positioned(
-          right: -40,
-          top: -40,
-          child: Container(
-            height: 140,
-            width: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.08),
-            ),
-          ),
-        ),
+  final nowTime = DateFormat('h:mm:ss a').format(DateTime.now());
+  final nextTime = TimeOfDay.fromDateTime(nextPrayerTime).format(context);
 
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // top row
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.access_time_filled_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  "NEXT PRAYER",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    letterSpacing: 1.3,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                if (cityName.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.18),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      cityName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      /// 🔔 Top Row
+      Center(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                theme.colorScheme.primary.withOpacity(0.10),
+                theme.colorScheme.surface.withOpacity(.9),
               ],
             ),
-
-            const SizedBox(height: 18),
-
-            // prayer name
-            Text(
-              nextPrayerName.isEmpty ? "FETCHING..." : nextPrayerName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-            ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.location_on, color: Colors.white70, size: 18),
+              const SizedBox(width: 6),
 
-            const SizedBox(height: 6),
-
-            // prayer time
-            Text(
-              formattedTime,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+              Text(
+                city.isEmpty ? "Locating..." : city,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
 
-            const SizedBox(height: 20),
+      const SizedBox(height: 32),
 
-            // countdown box
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.18),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white24),
-              ),
+      /// 🕐 Current Time
+      Center(
+        child: Text(
+          nowTime,
+          style: theme.textTheme.displayMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 32),
+
+      /// 🔷 Next Prayer Card
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+          ),
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.10),
+              Theme.of(context).colorScheme.surface.withOpacity(.9),
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            /// Prayer Info
+            Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "STARTS IN",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      letterSpacing: 1.4,
+                  Text(
+                    prayerName,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 6),
+
+                  const SizedBox(height: 4),
+
                   Text(
-                    remainingText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'monospace',
-                      letterSpacing: 1.5,
+                    "$nextTime - 7:30 PM",
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.9),
                     ),
                   ),
                 ],
               ),
             ),
+
+            IconButton(
+              icon: const Icon(Icons.volume_up, color: Colors.white),
+              onPressed: () {},
+            ),
+
+            IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              onPressed: () {},
+            ),
           ],
         ),
-      ],
-    ),
-  );
-}
+      ),
 
-String _formatDuration(Duration d) {
-  final hours = d.inHours.toString().padLeft(2, '0');
-  final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return "-$hours:$minutes:$seconds";
+      /// 🕌 All Prayer Times
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.only(
+            bottomRight: Radius.circular(18),
+            bottomLeft: Radius.circular(18),
+          ),
+          color: Theme.of(context).colorScheme.surface.withOpacity(.25),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _prayerItem("Fajr", formatTime(prayerTimes?.fajr)),
+            _prayerItem("Dhuhr", formatTime(prayerTimes?.dhuhr)),
+            _prayerItem("Asr", formatTime(prayerTimes?.asr)),
+            _prayerItem("Maghrib", formatTime(prayerTimes?.maghrib)),
+            _prayerItem("Isha", formatTime(prayerTimes?.isha)),
+          ],
+        ),
+      ),
+
+      SizedBox(height: 20),
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.all(Radius.circular(18)),
+          color: Theme.of(context).colorScheme.surface.withOpacity(.25),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _prayerItem("Tahajjud", formatTime(prayerTimes?.sunrise)),
+            _prayerItem("Sunrise", formatTime(prayerTimes?.sunrise)),
+            _prayerItem("Sunset", formatTime(prayerTimes?.maghrib)),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 String formatTime(DateTime? time) {
   if (time == null) return "--:--";
   return DateFormat.jm().format(time.toLocal());
+}
+
+Widget _prayerItem(String name, String? time) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        name,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Icon(
+        name == "Fajr"
+            ? Icons.wb_twilight
+            : name == "Dhuhr"
+            ? Icons.wb_sunny
+            : name == "Asr"
+            ? Icons.wb_cloudy
+            : name == "Maghrib" || name == "Sunset"
+            ? Icons.nights_stay
+            : Icons.dark_mode,
+        size: 26,
+        color: Colors.white.withOpacity(.85),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        time ?? "--:--",
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ],
+  );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/home.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/profile.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/rank_screen.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tools/tools.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tasbih.dart';
 
@@ -14,7 +15,13 @@ class SalahMainScreen extends StatefulWidget {
 class _SalahMainScreenState extends State<SalahMainScreen> {
   int currentIndex = 0;
 
-  final pages = const [HomePage(), TasbihPage(), ToolsScreen(), ProfilePage()];
+  final pages = const [
+    HomePage(),
+    TasbihPage(),
+    ToolsScreen(),
+    LeaderboardScreen(),
+    ProfilePage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +50,8 @@ class _SalahMainScreenState extends State<SalahMainScreen> {
           _navItem(Icons.home_rounded, "Home", 0),
           _navItem(Icons.touch_app_rounded, "Tasbih", 1),
           _navItem(Icons.settings_suggest_rounded, "Tools", 2),
-          _navItem(Icons.person_rounded, "Profile", 3),
+          _navItem(Icons.leaderboard, "Rank", 3),
+          _navItem(Icons.person_rounded, "Profile", 4),
         ],
       ),
     );
