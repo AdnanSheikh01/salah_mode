@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:salah_mode/screens/auth/login.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/contactform.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/donation.dart';
 import 'package:salah_mode/screens/utils/about_us.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/language.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/madhab_selection.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/profile/themeselection.dart';
@@ -18,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final int prayerNumber = 2;
+  User? user = FirebaseAuth.instance.currentUser;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,64 +34,125 @@ class _ProfilePageState extends State<ProfilePage> {
 
               /// 🟢 PROFILE HEADER
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
                       Theme.of(context).colorScheme.primary,
                       Theme.of(context).colorScheme.primaryContainer,
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    /// 👤 Avatar
-                    Container(
-                      height: 70,
-                      width: 70,
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary.withOpacity(.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-
-                    const SizedBox(width: 16),
-
                     /// 🧾 Name & Email
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Adnan Sheikh",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                      child: user == null
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Welcome to Salah Mode",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Login to sync your prayers & progress",
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(.85),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: Colors.white,
+                                  child: Text(
+                                    user?.displayName != null
+                                        ? user!.displayName![0].toUpperCase()
+                                        : "U",
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user?.displayName ?? "User",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      user?.email ?? "Signed in user",
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(.9),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text("adnan@example.com"),
-                        ],
-                      ),
                     ),
 
-                    /// ✏️ Edit
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.edit,
-                        color: Colors.white.withOpacity(.8),
-                      ),
-                    ),
+                    /// 🔐 Login button or edit icon
+                    user == null
+                        ? ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () {
+                              Get.to(() => const LoginScreen());
+                            },
+                            child: const Text(
+                              "Login",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          )
+                        : IconButton(
+                            onPressed: () {},
+                            icon: Icon(
+                              Icons.edit,
+                              color: Colors.white.withOpacity(.9),
+                            ),
+                          ),
                   ],
                 ),
               ),
@@ -280,31 +344,34 @@ class _ProfilePageState extends State<ProfilePage> {
 
               const SizedBox(height: 20),
 
-              /// 🚪 LOGOUT BUTTON
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              /// 🔐 LOGIN / LOGOUT BUTTON
+              user == null
+                  ? const SizedBox()
+                  : SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: user == null
+                              ? Colors.green
+                              : Colors.red,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () async {
+                          Get.dialog(_logoutDialog());
+                        },
+                        icon: Icon(Icons.logout, color: Colors.white),
+                        label: Text(
+                          "Logout",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  onPressed: () {},
-                  icon: Icon(
-                    Icons.logout,
-                    color: Theme.of(context).colorScheme.onError,
-                  ),
-                  label: Text(
-                    "Logout",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onError,
-                    ),
-                  ),
-                ),
-              ),
 
               const SizedBox(height: 30),
             ],
@@ -383,6 +450,110 @@ class _ProfilePageState extends State<ProfilePage> {
           color: Theme.of(context).colorScheme.onSurface.withOpacity(.5),
         ),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _logoutDialog() {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.surfaceContainerHighest,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            /// Icon
+            Container(
+              height: 60,
+              width: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).colorScheme.primary.withOpacity(.15),
+              ),
+              child: Icon(
+                Icons.mosque_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 30,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            /// Title
+            const Text(
+              "Leave Salah Mode?",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+
+            const SizedBox(height: 6),
+
+            /// Subtitle
+            Text(
+              "May Allah reward your efforts. Are you sure you want to logout?",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(.7),
+                fontSize: 13,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () => Get.back(),
+                    child: const Text("Stay"),
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: Colors.red,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      setState(() {
+                        user = null;
+                      });
+                      Get.back();
+                    },
+                    child: const Text(
+                      "Logout",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

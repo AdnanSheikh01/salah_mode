@@ -46,11 +46,14 @@ class _SplashScreenState extends State<SplashScreen>
       final user = FirebaseAuth.instance.currentUser;
       final box = GetStorage();
       final isFirstTime = box.read('first_time') ?? true;
+      bool skipped = box.read('skip') ?? false;
 
       if (!mounted) return;
 
       if (isFirstTime) {
         Get.offAll(() => const OnboardingScreen());
+      } else if (skipped) {
+        Get.offAll(() => const SalahMainScreen());
       } else if (user != null) {
         Get.offAll(() => const SalahMainScreen());
       } else {

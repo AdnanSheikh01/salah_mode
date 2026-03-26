@@ -1,12 +1,15 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For haptics
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'dart:convert';
 
+// Assuming these are your local imports
 import 'package:salah_mode/screens/widgets/daily_ayah.dart';
 import 'package:salah_mode/screens/widgets/next_prayer_card.dart';
 import 'package:salah_mode/screens/widgets/prayer_lock.dart';
@@ -21,25 +24,22 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+  // State variables
   bool prayerLockEnabled = false;
   int lockMinutes = 15;
-  bool emergencyUnlocked = false;
   DateTime _nextPrayerTime = DateTime.now();
   String _nextPrayerName = '';
-  final Madhab _madhab = Madhab.hanafi;
   PrayerTimes? _prayerTimes;
   Duration _remaining = Duration.zero;
   Timer? _timer;
-  bool beepOnEnd = false;
   final AudioPlayer _adhanPlayer = AudioPlayer();
-  String _cityName = '';
-  Prayer? currentPrayer;
+  String _cityName = 'Loading...';
 
   String _ayahText = '';
   String _ayahRef = '';
   bool _ayahLoading = true;
+  bool _isLocating = false;
 
-  bool _initialized = false;
   final Map<String, bool> _prayerTicks = {
     'Fajr': false,
     'Dhuhr': false,
@@ -48,24 +48,6 @@ class _HomePageState extends State<HomePage>
     'Isha': false,
   };
 
-  void _checkAllPrayersCompleted() {
-    final allDone = _prayerTicks.values.every((v) => v);
-
-    if (allDone && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          content: const Text(
-            "🏆 All prayers completed today! MashaAllah",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-
   @override
   bool get wantKeepAlive => true;
 
@@ -73,253 +55,374 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initLocationAndPrayers();
+    _initSequence();
     _loadDailyAyah();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
+  // --- Optimized Logic ---
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadPrayerTimes();
-    }
-  }
-
-  // --- Logic & Data Fetching ---
-
-  Future<void> _initLocationAndPrayers() async {
-    if (_initialized) return;
-    _initialized = true;
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    // Check if location services are enabled
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    permission = await Geolocator.checkPermission();
+  Future<void> _initSequence() async {
+    // 1. Check Permissions
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
     }
 
-    if (permission == LocationPermission.deniedForever) return;
+    // 2. Immediate Load (Fastest)
+    Position? lastPos = await Geolocator.getLastKnownPosition();
+    if (lastPos != null) {
+      _calculatePrayers(lastPos);
+    }
 
-    await _loadPrayerTimes();
+    // 3. Precise Update (Background)
+    _updateLocationSilently();
   }
 
-  Future<void> _loadPrayerTimes() async {
+  Future<void> _updateLocationSilently() async {
+    setState(() => _isLocating = true);
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.low, // Lower accuracy = much faster
+        timeLimit: const Duration(seconds: 5),
       );
+      _calculatePrayers(position);
+      _loadCityName(position.latitude, position.longitude);
+    } catch (e) {
+      debugPrint("Silent location update failed: $e");
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
 
-      final coordinates = Coordinates(position.latitude, position.longitude);
-      await _loadCityName(position.latitude, position.longitude);
+  void _calculatePrayers(Position pos) {
+    final coordinates = Coordinates(pos.latitude, pos.longitude);
+    final params = CalculationMethod.karachi.getParameters();
+    params.madhab = Madhab.hanafi;
 
-      final params = CalculationMethod.karachi.getParameters();
-      params.madhab = _madhab;
+    final prayerTimes = PrayerTimes(
+      coordinates,
+      DateComponents.from(DateTime.now()),
+      params,
+    );
 
-      final date = DateComponents.from(DateTime.now());
-      final prayerTimes = PrayerTimes(coordinates, date, params);
-
+    if (mounted) {
       setState(() {
         _prayerTimes = prayerTimes;
-        currentPrayer = prayerTimes.currentPrayer();
         _updateNextPrayer();
       });
-    } catch (e) {
-      debugPrint("Error loading prayers: $e");
     }
-  }
-
-  Future<void> _loadCityName(double lat, double lng) async {
-    try {
-      final placemarks = await placemarkFromCoordinates(lat, lng);
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        setState(() {
-          _cityName = place.locality ?? place.subAdministrativeArea ?? '';
-        });
-      }
-    } catch (_) {}
   }
 
   void _updateNextPrayer() {
     if (_prayerTimes == null) return;
-
     final next = _prayerTimes!.nextPrayer();
-    DateTime? time;
 
-    switch (next) {
-      case Prayer.fajr:
-        time = _prayerTimes!.fajr;
-        break;
-      case Prayer.sunrise:
-        time = _prayerTimes!.sunrise;
-        break;
-      case Prayer.dhuhr:
-        time = _prayerTimes!.dhuhr;
-        break;
-      case Prayer.asr:
-        time = _prayerTimes!.asr;
-        break;
-      case Prayer.maghrib:
-        time = _prayerTimes!.maghrib;
-        break;
-      case Prayer.isha:
-        time = _prayerTimes!.isha;
-        break;
-      case Prayer.none:
-        // After Isha → next is tomorrow Fajr
-        time = _prayerTimes!.fajr.add(const Duration(days: 1));
-        break;
+    // Logic for after Isha (tomorrow's Fajr)
+    if (next == Prayer.none) {
+      _nextPrayerName = "FAJR";
+      _nextPrayerTime = _prayerTimes!.fajr.add(const Duration(days: 1));
+    } else {
+      _nextPrayerName = next.name.toUpperCase();
+      _nextPrayerTime = _prayerTimes!.timeForPrayer(next)!;
     }
-
-    _nextPrayerName = next == Prayer.none ? 'FAJR' : next.name.toUpperCase();
-    _nextPrayerTime = time;
     _startCountdown();
   }
 
   void _startCountdown() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      final now = DateTime.now();
-      final diff = _nextPrayerTime.difference(now);
-
-      if (diff.inSeconds <= 0) {
-        timer.cancel();
-        await _playAdhan();
-        _loadPrayerTimes();
-        return;
-      }
-
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
-      setState(() {
-        _remaining = diff;
-      });
+      final diff = _nextPrayerTime.difference(DateTime.now());
+      if (diff.inSeconds <= 0) {
+        _updateLocationSilently(); // Refresh when time hits zero
+      } else {
+        setState(() => _remaining = diff);
+      }
     });
   }
 
-  Future<void> _playAdhan() async {
+  Future<void> _loadCityName(double lat, double lng) async {
     try {
-      await _adhanPlayer.play(AssetSource('audio/adhan.mp3'));
-    } catch (e) {
-      debugPrint('Adhan play error: $e');
-    }
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty && mounted) {
+        setState(() => _cityName = placemarks.first.locality ?? "Unknown");
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadDailyAyah() async {
-    setState(() => _ayahLoading = true);
-
     try {
-      // Random ayah with English translation
       final response = await http.get(
         Uri.parse('https://api.alquran.cloud/v1/ayah/random/en.asad'),
       );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final ayah = data['data'];
-
+      if (response.statusCode == 200 && mounted) {
+        final data = json.decode(response.body)['data'];
         setState(() {
-          _ayahText = ayah['text'] ?? '';
+          _ayahText = data['text'];
           _ayahRef =
-              '— ${ayah['surah']['englishName']} ${ayah['numberInSurah']}';
+              "— ${data['surah']['englishName']} ${data['numberInSurah']}";
           _ayahLoading = false;
         });
-      } else {
-        throw Exception('Failed to load ayah');
       }
-    } catch (e) {
-      debugPrint('Ayah API error: $e');
-      setState(() {
-        _ayahText = 'Unable to load Ayah';
-        _ayahRef = '';
-        _ayahLoading = false;
-      });
-    }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: DefaultTextStyle(
-        style: Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
-        child: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              await _loadPrayerTimes();
-              await _loadDailyAyah();
-            },
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              children: [
-                salamHeader(context),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: theme.colorScheme.primary,
+          onRefresh: () => _updateLocationSilently(),
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            children: [
+              const SizedBox(height: 10),
+              salamHeader(context),
+
+              const SizedBox(height: 25),
+
+              if (_prayerTimes == null)
+                _buildSkeletonLoader()
+              else ...[
+                premiumNextPrayerHeader(
+                  context,
+                  _nextPrayerTime,
+                  _remaining,
+                  _nextPrayerName,
+                  _cityName,
+                  _prayerTimes!,
+                ),
+
                 const SizedBox(height: 20),
-                if (_prayerTimes == null)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 60),
-                      child: CircularProgressIndicator(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  )
-                else ...[
-                  premiumNextPrayerHeader(
-                    context,
-                    _nextPrayerTime,
-                    _remaining,
-                    _nextPrayerName,
-                    _cityName,
-                    _prayerTimes!,
-                  ),
-                  const SizedBox(height: 20),
-                  prayerLockCard(
-                    context,
-                    prayerLockEnabled,
-                    lockMinutes,
-                    (v) => setState(() => prayerLockEnabled = v),
-                    (m) => setState(() => lockMinutes = m),
-                  ),
-                  const SizedBox(height: 20),
 
-                  prayerTickCard(context, _prayerTicks, (name, value) {
-                    setState(() => _prayerTicks[name] = value);
-                    _checkAllPrayersCompleted();
-                  }),
-                  const SizedBox(height: 20),
+                // Professional Section Title
+                _sectionHeader("UTILITIES", Icons.auto_awesome),
+                prayerLockCard(
+                  context,
+                  prayerLockEnabled,
+                  lockMinutes,
+                  (v) => setState(() => prayerLockEnabled = v),
+                  (m) => setState(() => lockMinutes = m),
+                ),
 
-                  prohibitedTimeCard(context, _prayerTimes!),
+                const SizedBox(height: 20),
 
-                  const SizedBox(height: 20),
+                _sectionHeader("DAILY TRACKER", Icons.event_available_rounded),
+                prayerTickCard(context, _prayerTicks, (name, value) {
+                  HapticFeedback.lightImpact();
+                  setState(() => _prayerTicks[name] = value);
+                  if (value) _checkAllPrayersCompleted();
+                }),
 
-                  dailyAyah(
-                    context,
-                    () => _loadDailyAyah(),
-                    _ayahLoading,
-                    _ayahText,
-                    _ayahRef,
-                  ),
-                ],
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+
+                prohibitedTimeCard(context, _prayerTimes!),
+
+                const SizedBox(height: 20),
+
+                dailyAyah(
+                  context,
+                  () => _loadDailyAyah(),
+                  _ayahLoading,
+                  _ayahText,
+                  _ayahRef,
+                ),
+                const SizedBox(height: 30),
               ],
-            ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _sectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.white38),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white38,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLoader() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+    );
+  }
+
+  void _checkAllPrayersCompleted() {
+    if (_prayerTicks.values.every((v) => v)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("MashaAllah! All prayers done."),
+          backgroundColor: Colors.green.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _adhanPlayer.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+}
+
+// --- Modified Professional Prohibited Card ---
+
+Widget prohibitedTimeCard(BuildContext context, PrayerTimes prayerTimes) {
+  final theme = Theme.of(context);
+
+  // Logic for ranges
+  final sunriseStart = prayerTimes.sunrise;
+  final sunriseEnd = sunriseStart.add(const Duration(minutes: 15));
+  final dhuhrTime = prayerTimes.dhuhr;
+  final zawalStart = dhuhrTime.subtract(const Duration(minutes: 10));
+  final maghribStart = prayerTimes.maghrib;
+  final sunsetStart = maghribStart.subtract(const Duration(minutes: 15));
+
+  String format(DateTime t) => DateFormat.jm().format(t.toLocal());
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A1A1A),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Colors.white.withOpacity(0.05)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Forbidden Times",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                "MAKRUH",
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _prohibitedRow(
+          "Sunrise (Shuruq)",
+          "${format(sunriseStart)} - ${format(sunriseEnd)}",
+        ),
+        _prohibitedRow(
+          "Midday (Zawal)",
+          "${format(zawalStart)} - ${format(dhuhrTime)}",
+        ),
+        _prohibitedRow(
+          "Sunset (Ghurub)",
+          "${format(sunsetStart)} - ${format(maghribStart)}",
+        ),
+
+        const SizedBox(height: 20),
+        const Divider(color: Colors.white10),
+        const SizedBox(height: 12),
+
+        // Full Hadith Text
+        Text(
+          "HADITH REFERENCE",
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          "“There were three times at which the Messenger of Allah (ﷺ) forbade us to pray, or to bury our dead: When the sun begins to rise till it is fully up, when the sun is at its height at midday till it passes over the meridian, and when the sun draws near to setting till it sets.”",
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.6),
+            fontSize: 12,
+            height: 1.5,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "— Sahih Muslim 831",
+          style: TextStyle(color: Colors.white24, fontSize: 11),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _prohibitedRow(String label, String time) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.history_toggle_off_rounded,
+          size: 18,
+          color: Colors.orangeAccent,
+        ),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        const Spacer(),
+        Text(
+          time,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 Widget prayerTickCard(
@@ -332,293 +435,66 @@ Widget prayerTickCard(
   return Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white10),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.25),
-          blurRadius: 12,
-          offset: const Offset(0, 6),
-        ),
-      ],
+      color: const Color(0xFF1A1A1A), // Graphite/Obsidian base
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Colors.white.withOpacity(0.05)),
     ),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// 🔹 Title
-        /// 🔹 Header Row
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.check_circle_rounded,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              "Prayer Tracker",
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.3,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 14),
-
-        /// 🔹 Prayer list
         ...ticks.keys.map((name) {
           final isDone = ticks[name] ?? false;
-
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               onTap: () => onChanged(name, !isDone),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
+                  horizontal: 16,
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
+                  // Slight glow when checked
                   color: isDone
-                      ? theme.colorScheme.primary.withOpacity(0.12)
+                      ? theme.colorScheme.primary.withOpacity(0.1)
                       : Colors.transparent,
                   border: Border.all(
-                    color: isDone ? theme.colorScheme.primary : Colors.white12,
-                    width: isDone ? 2 : 1,
+                    color: isDone ? theme.colorScheme.primary : Colors.white10,
                   ),
                 ),
                 child: Row(
                   children: [
-                    /// Prayer name
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    // Modern Icon Status
+                    Icon(
+                      isDone
+                          ? Icons.check_circle_rounded
+                          : Icons.panorama_fish_eye_rounded,
+                      color: isDone
+                          ? theme.colorScheme.primary
+                          : Colors.white24,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: isDone ? Colors.white : Colors.white70,
+                        fontWeight: isDone
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        fontSize: 15,
                       ),
                     ),
-
-                    /// Checkbox icon
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: Icon(
-                        isDone
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        key: ValueKey(isDone),
-                        color: isDone
-                            ? theme.colorScheme.primary
-                            : Colors.white54,
-                      ),
-                    ),
+                    const Spacer(),
+                    // Optional: Add prayer time here if you pass prayerTimes to this widget
                   ],
                 ),
               ),
             ),
           );
         }),
-      ],
-    ),
-  );
-}
-
-Widget prohibitedTimeCard(BuildContext context, PrayerTimes prayerTimes) {
-  final theme = Theme.of(context);
-
-  final sunrise = TimeOfDay.fromDateTime(prayerTimes.sunrise).format(context);
-  final dhuhr = TimeOfDay.fromDateTime(prayerTimes.dhuhr).format(context);
-  final maghrib = TimeOfDay.fromDateTime(prayerTimes.maghrib).format(context);
-
-  return Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white10),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.25),
-          blurRadius: 12,
-          offset: const Offset(0, 6),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        /// Header
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.block, color: Colors.orange),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              "Prohibited Prayer Times",
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 16),
-
-        /// Timeline bar showing forbidden zones
-        Builder(
-          builder: (context) {
-            final fajr = prayerTimes.fajr;
-            final sunrise = prayerTimes.sunrise;
-            final dhuhr = prayerTimes.dhuhr;
-            final asr = prayerTimes.asr;
-            final maghrib = prayerTimes.maghrib;
-
-            double _segment(DateTime start, DateTime end) {
-              final total = end.difference(start).inMinutes.toDouble();
-              if (total <= 0) return 0;
-              return total;
-            }
-
-            final fajrForbidden = _segment(fajr, sunrise);
-            final dhuhrForbidden = 10.0; // small peak period
-            final asrForbidden = _segment(asr, maghrib);
-
-            final safe1 = _segment(sunrise, dhuhr);
-            final safe2 = _segment(dhuhr, asr);
-
-            final total =
-                fajrForbidden + safe1 + dhuhrForbidden + safe2 + asrForbidden;
-
-            Widget buildPart(double value, Color color) {
-              return Expanded(
-                flex: (value * 1000 ~/ total).clamp(1, 1000),
-                child: Container(
-                  height: 10,
-                  decoration: BoxDecoration(color: color),
-                ),
-              );
-            }
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final now = DateTime.now();
-                    final start = fajr;
-                    final end = maghrib;
-
-                    double progress = 0;
-                    if (now.isAfter(start) && now.isBefore(end)) {
-                      final totalSeconds = end.difference(start).inSeconds;
-                      final passedSeconds = now.difference(start).inSeconds;
-                      progress = passedSeconds / totalSeconds;
-                    }
-
-                    return Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        Row(
-                          children: [
-                            buildPart(fajrForbidden, Colors.orange),
-                            buildPart(safe1, Colors.green),
-                            buildPart(dhuhrForbidden, Colors.orange),
-                            buildPart(safe2, Colors.green),
-                            buildPart(asrForbidden, Colors.orange),
-                          ],
-                        ),
-                        Positioned(
-                          left: constraints.maxWidth * progress,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.35),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text("Morning", style: TextStyle(fontSize: 11)),
-                    Text("Noon", style: TextStyle(fontSize: 11)),
-                    Text("Evening", style: TextStyle(fontSize: 11)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-            );
-          },
-        ),
-
-        /// Time blocks
-        _prohibitedTile("After Fajr until Sunrise", "7:00 AM - $sunrise"),
-        _prohibitedTile("When Sun is at its peak", "1:30 PM - $dhuhr"),
-        _prohibitedTile("After Asr until Maghrib", "4:00 PM - $maghrib"),
-
-        const SizedBox(height: 16),
-
-        /// Hadith
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            "The Messenger of Allah ﷺ forbade prayer after Fajr until the sun rises and after Asr until the sun sets.\n\n— Sahih al-Bukhari 586",
-            style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _prohibitedTile(String title, String time) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      children: [
-        const Icon(Icons.schedule, size: 18, color: Colors.orange),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-        Text(time, style: const TextStyle(color: Colors.grey)),
       ],
     ),
   );

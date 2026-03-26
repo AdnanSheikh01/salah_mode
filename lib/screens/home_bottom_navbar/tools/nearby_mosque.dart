@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/tools/detailed_nearby_mosque.dart';
@@ -7,6 +8,7 @@ import 'package:salah_mode/screens/utils/mosque_services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NearbyMosqueScreen extends StatefulWidget {
   const NearbyMosqueScreen({super.key});
@@ -19,8 +21,13 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
   final MosqueService service = MosqueService();
 
   List<Mosque> mosques = [];
+  Map<String, int> verifyVotes = {};
+  List<Mosque> userAddedMosques = [];
   bool loading = true;
   String? errorMessage;
+
+  // Helper to generate a unique mosque id
+  String mosqueId(Mosque m) => "${m.name}_${m.lat}_${m.lon}";
 
   String walkingTime(double distanceKm) {
     // average walking speed ≈ 5 km/h
@@ -42,11 +49,16 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
       });
 
       final result = await service.fetchNearbyMosques();
+      await loadUserMosques();
 
-      if (result.isEmpty) {
+      // Always merge API mosques with user-added mosques
+      mosques = [...result, ...userAddedMosques];
+
+      // Only show error if there are truly no mosques at all
+      if (mosques.isEmpty) {
         errorMessage = "No mosques found near your location.";
       } else {
-        mosques = result;
+        await loadVerification();
       }
 
       log("Mosques found: ${mosques.length}");
@@ -61,6 +73,106 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
         loading = false;
       });
     }
+  }
+
+  Future<void> loadVerification() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (var m in mosques) {
+      verifyVotes[mosqueId(m)] = prefs.getInt("verify_${mosqueId(m)}") ?? 0;
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> loadUserMosques() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString("user_mosques");
+
+    if (data != null) {
+      final List decoded = jsonDecode(data);
+      userAddedMosques = decoded.map((e) {
+        return Mosque(
+          name: e["name"],
+          lat: e["lat"],
+          lon: e["lon"],
+          distance: 0,
+        );
+      }).toList();
+    }
+  }
+
+  Future<void> saveUserMosques() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final data = userAddedMosques
+        .map((m) => {"name": m.name, "lat": m.lat, "lon": m.lon})
+        .toList();
+
+    await prefs.setString("user_mosques", jsonEncode(data));
+  }
+
+  Future<void> addMosque() async {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Add Masjid"),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: "Enter masjid name"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              child: const Text("Add"),
+              onPressed: () async {
+                final name = controller.text.trim();
+                if (name.isEmpty) return;
+
+                double lat = mosques.isNotEmpty ? mosques.first.lat : 28.6139;
+                double lon = mosques.isNotEmpty ? mosques.first.lon : 77.2090;
+
+                final newMosque = Mosque(
+                  name: name,
+                  lat: lat,
+                  lon: lon,
+                  distance: 0,
+                );
+
+                setState(() {
+                  userAddedMosques.add(newMosque);
+                  mosques.add(newMosque);
+                  verifyVotes[name] = 0;
+                });
+
+                await saveUserMosques();
+
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> verifyMosque(Mosque mosque) async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = mosqueId(mosque);
+    int current = verifyVotes[id] ?? 0;
+    current += 1;
+    verifyVotes[id] = current;
+    await prefs.setInt("verify_$id", current);
+
+    if (mounted) setState(() {});
+  }
+
+  bool isVerified(Mosque mosque) {
+    return (verifyVotes[mosqueId(mosque)] ?? 0) >= 3;
   }
 
   @override
@@ -122,7 +234,9 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
                   clipBehavior: Clip.antiAlias,
                   child: FlutterMap(
                     options: MapOptions(
-                      initialCenter: LatLng(mosques[0].lat, mosques[0].lon),
+                      initialCenter: mosques.isNotEmpty
+                          ? LatLng(mosques.first.lat, mosques.first.lon)
+                          : const LatLng(28.6139, 77.2090),
                       initialZoom: 14,
                     ),
                     children: [
@@ -137,9 +251,11 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
                             point: LatLng(m.lat, m.lon),
                             width: 40,
                             height: 40,
-                            child: const Icon(
+                            child: Icon(
                               Icons.mosque,
-                              color: Colors.green,
+                              color: isVerified(m)
+                                  ? Colors.green
+                                  : Colors.orange,
                               size: 30,
                             ),
                           );
@@ -161,11 +277,13 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => MosqueDetailScreen(mosque: m),
+                              builder: (_) => MosqueDetailPage(
+                                mosqueName: m.name,
+                                mosqueId: mosqueId(m),
+                              ),
                             ),
                           );
                         },
-
                         child: Container(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -206,49 +324,59 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            m.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 16,
-                                            ),
-                                          ),
+                                    Expanded(
+                                      child: Text(
+                                        m.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
                                         ),
-                                        if (index == 0)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.green,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: const Text(
-                                              "Nearest",
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "${m.distance.toStringAsFixed(2)} km • ${walkingTime(m.distance)}",
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 13,
                                       ),
                                     ),
+                                    if (isVerified(m))
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "Verified",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    if (!isVerified(m))
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          "${(3 - (verifyVotes[mosqueId(m)] ?? 0)).clamp(0, 3)} confirmations needed",
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -276,6 +404,16 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
                                       }
                                     },
                                   ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.verified_outlined,
+                                      size: 20,
+                                    ),
+                                    tooltip: "Verify mosque info",
+                                    onPressed: () {
+                                      verifyMosque(m);
+                                    },
+                                  ),
                                 ],
                               ),
                             ],
@@ -287,6 +425,12 @@ class _NearbyMosqueScreenState extends State<NearbyMosqueScreen> {
                 ),
               ],
             ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.green,
+        tooltip: "Add Masjid",
+        onPressed: addMosque,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

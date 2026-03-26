@@ -141,7 +141,7 @@ final List<Map<String, String>> steps = [
     "desc": "First turn head right and then left to finish the prayer.",
     "hadith":
         "The Prophet ﷺ ended the prayer by saying salam to the right and left. — Sahih Muslim 582",
-    "image": "assets/prayer/sitting.png",
+    "image": "assets/prayer/salam.png",
   },
   {
     "title": "After Salah Dhikr",
@@ -193,6 +193,6 @@ final List<Map<String, String>> steps = [
         "and then say: Allahumma anta as-salam wa minkas-salam. "
         "— Sahih Muslim 591",
 
-    "image": "assets/prayer/sitting.png",
+    "image": "assets/prayer/dhikr.png",
   },
 ];

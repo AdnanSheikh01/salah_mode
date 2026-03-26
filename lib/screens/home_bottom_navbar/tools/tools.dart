@@ -10,6 +10,7 @@ import 'package:salah_mode/screens/home_bottom_navbar/tools/prayer_times.dart';
 
 import 'package:salah_mode/screens/home_bottom_navbar/tools/qibla_finder.dart';
 import 'package:salah_mode/screens/home_bottom_navbar/surah_list.dart';
+import 'package:salah_mode/screens/home_bottom_navbar/tools/smart_prayer.dart';
 
 class ToolsScreen extends StatefulWidget {
   const ToolsScreen({super.key});
@@ -236,7 +237,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
                       } else if (tool.title == "Prayer Guide") {
                         _openPrayerGuide();
                       } else {
-                        _comingSoon();
+                        _openSmartCompanion();
                       }
                     },
                   ),
@@ -381,17 +382,6 @@ class _ToolsScreenState extends State<ToolsScreen> {
 
   // ---------- ACTIONS ----------
 
-  void _comingSoon() {
-    Get.snackbar(
-      "Coming Soon",
-      "This feature will be available soon in Salah Mode.",
-      backgroundColor: Colors.orange,
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(12),
-      borderRadius: 12,
-    );
-  }
-
   void _opendailyHadith() {
     Get.to(() => const DailyHadithScreen());
   }
@@ -429,89 +419,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
   }
 
   void _openSmartCompanion() {
-    Get.bottomSheet(
-      _bottomSheetTemplate(
-        icon: Icons.auto_awesome,
-        title: "Smart Prayer Companion 🧠",
-        desc:
-            "AI-powered assistant that will guide your daily salah and habits.",
-        buttonText: "Notify Me",
-      ),
-      isScrollControlled: true,
-    );
-  }
-
-  Widget _bottomSheetTemplate({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required String buttonText,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(Get.context!).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          Icon(
-            icon,
-            color: Theme.of(Get.context!).colorScheme.primary,
-            size: 42,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              color: Theme.of(Get.context!).colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            desc,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(
-                Get.context!,
-              ).colorScheme.onSurface.withOpacity(.7),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealAccent,
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                Get.back();
-                _comingSoon();
-              },
-              child: Text(buttonText),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-      ),
-    );
+    Get.to(() => const SmartCompanionScreen());
   }
 }
 

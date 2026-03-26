@@ -1,10 +1,16 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MosqueDetailPage extends StatefulWidget {
-  const MosqueDetailPage({super.key});
+  final String mosqueId;
+  final String mosqueName;
+
+  const MosqueDetailPage({
+    super.key,
+    required this.mosqueId,
+    required this.mosqueName,
+  });
 
   @override
   State<MosqueDetailPage> createState() => _MosqueDetailPageState();
@@ -25,80 +31,46 @@ class _MosqueDetailPageState extends State<MosqueDetailPage> {
     "Parking": false,
   };
 
+  String key(String field) => "${widget.mosqueId}_$field";
+
+  String getRank() {
+    if (barakahPoints >= 200) return "Ummah Builder";
+    if (barakahPoints >= 100) return "Mosque Guardian";
+    if (barakahPoints >= 50) return "Mosque Helper";
+    if (barakahPoints >= 10) return "Contributor";
+    return "New Helper";
+  }
+
   @override
   void initState() {
     super.initState();
-    loadTimes();
-    loadFacilities();
+    loadData();
   }
 
-  String randomTime(int hour) {
-    final r = Random();
-    int minute = r.nextInt(60);
-    return "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
-  }
-
-  Future<void> loadTimes() async {
+  Future<void> loadData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    if (prefs.getString("fajrAdhan") == null) {
-      times = {
-        "fajrAdhan": randomTime(5),
-        "fajrJamaat": randomTime(5),
-        "zuhrAdhan": randomTime(13),
-        "zuhrJamaat": randomTime(13),
-        "asrAdhan": randomTime(16),
-        "asrJamaat": randomTime(16),
-        "maghribAdhan": randomTime(18),
-        "maghribJamaat": randomTime(18),
-        "ishaAdhan": randomTime(20),
-        "ishaJamaat": randomTime(20),
-      };
+    barakahPoints = prefs.getInt("barakah_points") ?? 0;
 
-      saveTimes();
-    } else {
-      times = {
-        "fajrAdhan": prefs.getString("fajrAdhan")!,
-        "fajrJamaat": prefs.getString("fajrJamaat")!,
-        "zuhrAdhan": prefs.getString("zuhrAdhan")!,
-        "zuhrJamaat": prefs.getString("zuhrJamaat")!,
-        "asrAdhan": prefs.getString("asrAdhan")!,
-        "asrJamaat": prefs.getString("asrJamaat")!,
-        "maghribAdhan": prefs.getString("maghribAdhan")!,
-        "maghribJamaat": prefs.getString("maghribJamaat")!,
-        "ishaAdhan": prefs.getString("ishaAdhan")!,
-        "ishaJamaat": prefs.getString("ishaJamaat")!,
-      };
-    }
+    times = {
+      "fajrAdhan": prefs.getString(key("fajrAdhan")) ?? "--",
+      "fajrJamaat": prefs.getString(key("fajrJamaat")) ?? "--",
+      "zuhrAdhan": prefs.getString(key("zuhrAdhan")) ?? "--",
+      "zuhrJamaat": prefs.getString(key("zuhrJamaat")) ?? "--",
+      "asrAdhan": prefs.getString(key("asrAdhan")) ?? "--",
+      "asrJamaat": prefs.getString(key("asrJamaat")) ?? "--",
+      "maghribAdhan": prefs.getString(key("maghribAdhan")) ?? "--",
+      "maghribJamaat": prefs.getString(key("maghribJamaat")) ?? "--",
+      "ishaAdhan": prefs.getString(key("ishaAdhan")) ?? "--",
+      "ishaJamaat": prefs.getString(key("ishaJamaat")) ?? "--",
+    };
 
-    setState(() {});
-  }
-
-  Future<void> loadFacilities() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    if (prefs.getBool("facility_wudu") == null) {
-      final r = Random();
-
-      facilities = {
-        "Wudu Area": r.nextBool(),
-        "Wheelchair Access": r.nextBool(),
-        "Women Prayer Area": r.nextBool(),
-        "Parking": r.nextBool(),
-      };
-
-      prefs.setBool("facility_wudu", facilities["Wudu Area"]!);
-      prefs.setBool("facility_wheelchair", facilities["Wheelchair Access"]!);
-      prefs.setBool("facility_women", facilities["Women Prayer Area"]!);
-      prefs.setBool("facility_parking", facilities["Parking"]!);
-    } else {
-      facilities = {
-        "Wudu Area": prefs.getBool("facility_wudu") ?? false,
-        "Wheelchair Access": prefs.getBool("facility_wheelchair") ?? false,
-        "Women Prayer Area": prefs.getBool("facility_women") ?? false,
-        "Parking": prefs.getBool("facility_parking") ?? false,
-      };
-    }
+    facilities = {
+      "Wudu Area": prefs.getBool(key("wudu")) ?? false,
+      "Wheelchair Access": prefs.getBool(key("wheelchair")) ?? false,
+      "Women Prayer Area": prefs.getBool(key("women")) ?? false,
+      "Parking": prefs.getBool(key("parking")) ?? false,
+    };
 
     setState(() {});
   }
@@ -106,12 +78,12 @@ class _MosqueDetailPageState extends State<MosqueDetailPage> {
   Future<void> saveTimes() async {
     final prefs = await SharedPreferences.getInstance();
 
-    times.forEach((key, value) {
-      prefs.setString(key, value);
-    });
+    for (var entry in times.entries) {
+      await prefs.setString(key(entry.key), entry.value);
+    }
   }
 
-  Future<void> changeTime(String key) async {
+  Future<void> changeTime(String keyName) async {
     TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -122,23 +94,16 @@ class _MosqueDetailPageState extends State<MosqueDetailPage> {
           "${picked.hour}:${picked.minute.toString().padLeft(2, '0')}";
 
       setState(() {
-        times[key] = newTime;
+        times[keyName] = newTime;
         pendingPoints += 5;
       });
 
       saveTimes();
-
-      Get.snackbar(
-        "Change Saved",
-        "Submit changes to earn Barakah points",
-        snackPosition: SnackPosition.BOTTOM,
-      );
     }
   }
 
   Widget prayerRow(String prayer, String adhanKey, String jamaatKey) {
     return Card(
-      elevation: 2,
       child: ListTile(
         title: Text(prayer),
         subtitle: Row(
@@ -150,7 +115,6 @@ class _MosqueDetailPageState extends State<MosqueDetailPage> {
                 children: [const Text("Adhan"), Text(times[adhanKey] ?? "--")],
               ),
             ),
-
             GestureDetector(
               onTap: editMode ? () => changeTime(jamaatKey) : null,
               child: Column(
@@ -166,11 +130,32 @@ class _MosqueDetailPageState extends State<MosqueDetailPage> {
     );
   }
 
+  Future<void> submitChanges() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      barakahPoints += pendingPoints;
+      pendingPoints = 0;
+    });
+
+    await prefs.setInt("barakah_points", barakahPoints);
+
+    Get.snackbar(
+      "Barakah Earned",
+      "JazakAllah Khair! Your update helped the Ummah.",
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (times.isEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mosque Details"),
+        title: Text(widget.mosqueName),
         actions: [
           IconButton(
             icon: Icon(editMode ? Icons.check : Icons.edit),
@@ -183,163 +168,82 @@ class _MosqueDetailPageState extends State<MosqueDetailPage> {
         ],
       ),
 
-      body: times.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            "Prayer Times",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+
+          const SizedBox(height: 10),
+
+          prayerRow("Fajr", "fajrAdhan", "fajrJamaat"),
+          prayerRow("Zuhr", "zuhrAdhan", "zuhrJamaat"),
+          prayerRow("Asr", "asrAdhan", "asrJamaat"),
+          prayerRow("Maghrib", "maghribAdhan", "maghribJamaat"),
+          prayerRow("Isha", "ishaAdhan", "ishaJamaat"),
+
+          const SizedBox(height: 30),
+
+          const Text(
+            "Facilities",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+
+          const SizedBox(height: 10),
+
+          ...facilities.keys.map((facility) {
+            bool value = facilities[facility]!;
+
+            return SwitchListTile(
+              title: Text(facility),
+              value: value,
+              onChanged: editMode
+                  ? (val) async {
+                      final prefs = await SharedPreferences.getInstance();
+
+                      setState(() {
+                        facilities[facility] = val;
+                        pendingPoints += 2;
+                      });
+
+                      await prefs.setBool(key(facility), val);
+                    }
+                  : null,
+            );
+          }),
+
+          const SizedBox(height: 30),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
               children: [
-                const Text(
-                  "Prayer Times",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 10),
-
-                prayerRow("Fajr", "fajrAdhan", "fajrJamaat"),
-                prayerRow("Zuhr", "zuhrAdhan", "zuhrJamaat"),
-                prayerRow("Asr", "asrAdhan", "asrJamaat"),
-                prayerRow("Maghrib", "maghribAdhan", "maghribJamaat"),
-                prayerRow("Isha", "ishaAdhan", "ishaJamaat"),
-
-                const SizedBox(height: 30),
-
-                const Text(
-                  "Accessibility",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 10),
-
-                ...facilities.keys.map((key) {
-                  IconData icon;
-
-                  if (key == "Wudu Area") {
-                    icon = Icons.water_drop;
-                  } else if (key == "Wheelchair Access") {
-                    icon = Icons.accessible;
-                  } else if (key == "Women Prayer Area") {
-                    icon = Icons.woman;
-                  } else {
-                    icon = Icons.local_parking;
-                  }
-
-                  bool value = facilities[key]!;
-
-                  return GestureDetector(
-                    onTap: editMode
-                        ? () async {
-                            final prefs = await SharedPreferences.getInstance();
-                            bool newVal = !value;
-
-                            setState(() {
-                              facilities[key] = newVal;
-                              pendingPoints += 2;
-                            });
-
-                            if (key == "Wudu Area")
-                              prefs.setBool("facility_wudu", newVal);
-                            if (key == "Wheelchair Access")
-                              prefs.setBool("facility_wheelchair", newVal);
-                            if (key == "Women Prayer Area")
-                              prefs.setBool("facility_women", newVal);
-                            if (key == "Parking")
-                              prefs.setBool("facility_parking", newVal);
-                          }
-                        : null,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            blurRadius: 6,
-                            color: Colors.black.withOpacity(0.06),
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor: Colors.green.withOpacity(0.15),
-                            child: Icon(icon, color: Colors.green),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              key,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            value ? Icons.check_circle : Icons.cancel,
-                            color: value ? Colors.green : Colors.redAccent,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: 30),
-
-                Column(
-                  children: [
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          "Barakah Points: $barakahPoints",
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    if (pendingPoints > 0)
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.volunteer_activism),
-                        label: Text(
-                          "Submit & Earn $pendingPoints Barakah Points",
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            barakahPoints += pendingPoints;
-                            pendingPoints = 0;
-                          });
-
-                          Get.snackbar(
-                            "Barakah Earned",
-                            "Your contribution earned rewards!",
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                        },
-                      ),
-                  ],
+                Text("Rank: ${getRank()}"),
+                const SizedBox(height: 6),
+                Text(
+                  "Barakah Points: $barakahPoints",
+                  style: const TextStyle(fontSize: 18),
                 ),
               ],
             ),
+          ),
+
+          const SizedBox(height: 20),
+
+          if (pendingPoints > 0)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.volunteer_activism),
+              label: Text("Submit & Earn $pendingPoints Barakah Points"),
+              onPressed: submitChanges,
+            ),
+        ],
+      ),
     );
   }
 }

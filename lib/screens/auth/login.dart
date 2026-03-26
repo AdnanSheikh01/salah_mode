@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:salah_mode/screens/auth/signup.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:salah_mode/screens/main_screen.dart';
+import 'package:salah_mode/screens/widgets/other_login_header.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,15 +21,8 @@ class _LoginScreenState extends State<LoginScreen>
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passController = TextEditingController();
-  final mobileController = TextEditingController();
-  final otpController = TextEditingController();
-  int _loginMethod = 0; // 0 = email, 1 = mobile
+  bool _isLoading = false;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  String? _verificationId;
-
-  int _resendSeconds = 0;
-  Timer? _timer;
-  bool _isSendingOtp = false;
 
   bool obscure = true;
 
@@ -60,9 +55,6 @@ class _LoginScreenState extends State<LoginScreen>
     nameController.dispose();
     emailController.dispose();
     passController.dispose();
-    mobileController.dispose();
-    otpController.dispose();
-    _timer?.cancel();
     super.dispose();
   }
 
@@ -70,44 +62,31 @@ class _LoginScreenState extends State<LoginScreen>
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      if (_loginMethod == 0) {
-        // Email login
-        await _auth.signInWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passController.text.trim(),
-        );
-      } else {
-        // Mobile OTP verify
-        if (_verificationId == null) {
-          Get.snackbar(
-            "Error",
-            "Please request OTP first",
-            snackPosition: SnackPosition.BOTTOM,
-          );
-          return;
-        }
-
-        final credential = PhoneAuthProvider.credential(
-          verificationId: _verificationId!,
-          smsCode: otpController.text.trim(),
-        );
-
-        await _auth.signInWithCredential(credential);
-      }
+      setState(() => _isLoading = true);
+      // Email login
+      await _auth.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passController.text.trim(),
+      );
 
       Get.snackbar(
         "Success",
         "Logged in successfully",
-        snackPosition: SnackPosition.BOTTOM,
+        colorText: Colors.white,
+        backgroundColor: Colors.green,
       );
+      setState(() => _isLoading = false);
 
       // Navigate to main screen
       Get.offAll(() => const SalahMainScreen());
     } catch (e) {
+      setState(() => _isLoading = false);
       Get.snackbar(
         "Login Failed",
         e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
+
+        colorText: Colors.white,
+        backgroundColor: Colors.red,
       );
     }
   }
@@ -144,11 +123,34 @@ class _LoginScreenState extends State<LoginScreen>
                           const SizedBox(height: 20),
 
                           /// 🌙 Title
-                          Text(
-                            "Log In to Salah Mode",
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Log In to Salah Mode",
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primary
+                                      .withOpacity(0.1),
+                                ),
+                                onPressed: () {
+                                  final box = GetStorage();
+                                  box.write('skip', true);
+                                  Get.offAll(() => const SalahMainScreen());
+                                },
+                                child: Text(
+                                  "Skip",
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
 
                           const SizedBox(height: 6),
@@ -160,224 +162,58 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
 
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 40),
 
-                          // 🔀 Login method toggle
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.06),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _loginMethod = 0),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _loginMethod == 0
-                                            ? theme.colorScheme.primary
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "Email",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: _loginMethod == 0
-                                                ? Colors.black
-                                                : Colors.white70,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _loginMethod = 1),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _loginMethod == 1
-                                            ? theme.colorScheme.primary
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "Mobile",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: _loginMethod == 1
-                                                ? Colors.black
-                                                : Colors.white70,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          /// 📧 Email
+                          _field(
+                            controller: emailController,
+                            hint: "Email",
+                            icon: Icons.email_outlined,
+                            validator: (v) =>
+                                v!.isEmpty ? "Enter your email" : null,
                           ),
 
                           const SizedBox(height: 20),
 
-                          if (_loginMethod == 0) ...[
-                            /// 📧 Email
-                            _field(
-                              controller: emailController,
-                              hint: "Email",
-                              icon: Icons.email_outlined,
-                              validator: (v) =>
-                                  v!.isEmpty ? "Enter your email" : null,
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            /// 🔒 Password
-                            _field(
-                              controller: passController,
-                              hint: "Password",
-                              icon: Icons.lock_outline,
-                              isPassword: true,
-                              validator: (v) => v!.length < 6
-                                  ? "Password must be at least 6 characters"
-                                  : null,
-                            ),
-                          ] else ...[
-                            /// 📱 Mobile
-                            _field(
-                              controller: mobileController,
-                              hint: "Mobile Number",
-                              icon: Icons.phone_outlined,
-                              validator: (v) =>
-                                  v!.length < 10 ? "Enter valid mobile" : null,
-                            ),
-
-                            const SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: (_resendSeconds > 0 || _isSendingOtp)
-                                    ? null
-                                    : () async {
-                                        if (mobileController.text.length < 10) {
-                                          Get.snackbar(
-                                            "Error",
-                                            "Enter valid mobile number",
-                                            snackPosition: SnackPosition.BOTTOM,
-                                          );
-                                          return;
-                                        }
-
-                                        setState(() => _isSendingOtp = true);
-
-                                        await _auth.verifyPhoneNumber(
-                                          phoneNumber:
-                                              "+91${mobileController.text.trim()}",
-                                          verificationCompleted:
-                                              (
-                                                PhoneAuthCredential credential,
-                                              ) async {
-                                                await _auth
-                                                    .signInWithCredential(
-                                                      credential,
-                                                    );
-                                              },
-                                          verificationFailed:
-                                              (FirebaseAuthException e) {
-                                                setState(
-                                                  () => _isSendingOtp = false,
-                                                );
-                                                Get.snackbar(
-                                                  "OTP Failed",
-                                                  e.message ??
-                                                      "Verification failed",
-                                                  snackPosition:
-                                                      SnackPosition.BOTTOM,
-                                                );
-                                              },
-                                          codeSent:
-                                              (
-                                                String verificationId,
-                                                int? resendToken,
-                                              ) {
-                                                _verificationId =
-                                                    verificationId;
-                                                _startOtpTimer();
-                                                setState(
-                                                  () => _isSendingOtp = false,
-                                                );
-                                                Get.snackbar(
-                                                  "OTP Sent",
-                                                  "Check your mobile for OTP",
-                                                  snackPosition:
-                                                      SnackPosition.BOTTOM,
-                                                );
-                                              },
-                                          codeAutoRetrievalTimeout:
-                                              (String verificationId) {
-                                                _verificationId =
-                                                    verificationId;
-                                              },
-                                        );
-                                      },
-                                child: Text(
-                                  _isSendingOtp
-                                      ? "Sending..."
-                                      : (_resendSeconds > 0
-                                            ? "Resend in ${_resendSeconds}s"
-                                            : "Send OTP"),
-                                  style: TextStyle(
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            /// 🔢 OTP
-                            _field(
-                              controller: otpController,
-                              hint: "OTP",
-                              icon: Icons.lock_clock_outlined,
-                              validator: (v) => v!.isEmpty ? "Enter OTP" : null,
-                            ),
-                          ],
-
-                          const SizedBox(height: 28),
+                          /// 🔒 Password
+                          _field(
+                            controller: passController,
+                            hint: "Password",
+                            icon: Icons.lock_outline,
+                            isPassword: true,
+                            validator: (v) => v!.length < 6
+                                ? "Password must be at least 6 characters"
+                                : null,
+                          ),
+                          const SizedBox(height: 30),
 
                           // 🚀 Sign up button
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
+                          _isLoading
+                              ? Center(
+                                  child: CircularProgressIndicator(
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                )
+                              : SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    onPressed: _submit,
+                                    child: const Text(
+                                      "Log In",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              onPressed: _submit,
-                              child: const Text(
-                                "Log In",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
 
                           const SizedBox(height: 24),
 
@@ -397,6 +233,13 @@ class _LoginScreenState extends State<LoginScreen>
                               ],
                             ),
                           ),
+
+                          const SizedBox(height: 20),
+                          // 🌐 Other login options
+                          otherLoginHeader(
+                            context,
+                            _auth.signInWithPopup(GoogleAuthProvider()),
+                          ),
                         ],
                       ),
                     ),
@@ -408,18 +251,6 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       ),
     );
-  }
-
-  void _startOtpTimer() {
-    _timer?.cancel();
-    _resendSeconds = 30;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendSeconds == 0) {
-        timer.cancel();
-      } else {
-        setState(() => _resendSeconds--);
-      }
-    });
   }
 
   // ================= FIELD =================
@@ -468,4 +299,6 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
   }
+
+  // ================= OTHER LOGIN OPTIONS =================
 }

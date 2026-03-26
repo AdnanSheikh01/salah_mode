@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:salah_mode/screens/auth/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:salah_mode/screens/main_screen.dart';
+import 'package:salah_mode/screens/widgets/other_login_header.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -20,20 +22,11 @@ class _SignUpScreenState extends State<SignUpScreen>
   final emailController = TextEditingController();
   final passController = TextEditingController();
   final confirmPassController = TextEditingController();
-  final mobileController = TextEditingController();
-  final otpController = TextEditingController();
+  bool _isLoading = false;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool obscure = true;
-  int _signupMethod = 0; // 0=email, 1=mobile
-
-  String? _verificationId;
-
-  // ⭐ PREMIUM OTP STATE
-  int _resendSeconds = 0;
-  Timer? _timer;
-  bool _isSendingOtp = false;
 
   late AnimationController _animController;
   late Animation<double> _fade;
@@ -61,14 +54,11 @@ class _SignUpScreenState extends State<SignUpScreen>
   @override
   void dispose() {
     _animController.dispose();
-    _timer?.cancel();
 
     nameController.dispose();
     emailController.dispose();
     passController.dispose();
     confirmPassController.dispose();
-    mobileController.dispose();
-    otpController.dispose();
     super.dispose();
   }
 
@@ -77,38 +67,15 @@ class _SignUpScreenState extends State<SignUpScreen>
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    setState(() => _isLoading = true);
+
     try {
-      if (_signupMethod == 0) {
-        await _auth.createUserWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passController.text.trim(),
-        );
-        // Save display name
-        await _auth.currentUser?.updateDisplayName(nameController.text.trim());
-      } else {
-        if (_verificationId == null) {
-          Get.snackbar(
-            "Error",
-            "Please request OTP first",
-            colorText: Colors.white,
-            backgroundColor: Colors.red,
-          );
-          return;
-        }
-
-        final credential = PhoneAuthProvider.credential(
-          verificationId: _verificationId!,
-          smsCode: otpController.text.trim(),
-        );
-
-        await _auth.signInWithCredential(credential);
-        // Save display name for phone user
-        if (nameController.text.trim().isNotEmpty) {
-          await _auth.currentUser?.updateDisplayName(
-            nameController.text.trim(),
-          );
-        }
-      }
+      await _auth.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passController.text.trim(),
+      );
+      // Save display name
+      await _auth.currentUser?.updateDisplayName(nameController.text.trim());
 
       Get.snackbar(
         "Success",
@@ -116,8 +83,11 @@ class _SignUpScreenState extends State<SignUpScreen>
         colorText: Colors.white,
         backgroundColor: Colors.green,
       );
+
+      setState(() => _isLoading = false);
       Get.offAll(() => const SalahMainScreen());
     } catch (e) {
+      setState(() => _isLoading = false);
       Get.snackbar(
         "Signup Failed",
         e.toString(),
@@ -125,21 +95,6 @@ class _SignUpScreenState extends State<SignUpScreen>
         backgroundColor: Colors.red,
       );
     }
-  }
-
-  // ================= OTP TIMER =================
-
-  void _startOtpTimer() {
-    _timer?.cancel();
-    _resendSeconds = 30;
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendSeconds == 0) {
-        timer.cancel();
-      } else {
-        setState(() => _resendSeconds--);
-      }
-    });
   }
 
   // ================= UI =================
@@ -175,11 +130,33 @@ class _SignUpScreenState extends State<SignUpScreen>
                         children: [
                           const SizedBox(height: 20),
 
-                          Text(
-                            "Create Account",
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Create Account",
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primary
+                                      .withOpacity(0.1),
+                                ),
+                                onPressed: () {
+                                  final box = GetStorage();
+                                  box.write('skip', true);
+                                  Get.offAll(() => const SalahMainScreen());
+                                },
+                                child: Text(
+                                  "Skip",
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
 
                           const SizedBox(height: 8),
@@ -193,37 +170,21 @@ class _SignUpScreenState extends State<SignUpScreen>
 
                           const SizedBox(height: 30),
 
-                          // 🔀 Toggle
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.06),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                _toggle(theme, "Email", 0),
-                                _toggle(theme, "Mobile", 1),
-                              ],
-                            ),
-                          ),
-
                           const SizedBox(height: 20),
 
-                          if (_signupMethod == 0)
-                            ..._emailFields()
-                          else
-                            ..._mobileFields(theme),
+                          ..._emailFields(),
 
                           const SizedBox(height: 28),
 
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _submit,
-                              child: const Text("Create Account"),
-                            ),
-                          ),
+                          _isLoading
+                              ? Center(child: const CircularProgressIndicator())
+                              : SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: _submit,
+                                    child: const Text("Create Account"),
+                                  ),
+                                ),
 
                           const SizedBox(height: 24),
 
@@ -244,6 +205,12 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 ),
                               ],
                             ),
+                          ),
+
+                          const SizedBox(height: 20),
+                          otherLoginHeader(
+                            context,
+                            _auth.signInWithPopup(GoogleAuthProvider()),
                           ),
                         ],
                       ),
@@ -293,125 +260,6 @@ class _SignUpScreenState extends State<SignUpScreen>
           v != passController.text ? "Passwords do not match" : null,
     ),
   ];
-
-  // ================= MOBILE FIELDS =================
-
-  List<Widget> _mobileFields(ThemeData theme) => [
-    _field(
-      controller: nameController,
-      hint: "Name",
-      icon: Icons.person_outline,
-      validator: (v) => v!.isEmpty ? "Enter your name" : null,
-    ),
-    const SizedBox(height: 16),
-    _field(
-      controller: mobileController,
-      hint: "Mobile Number",
-      icon: Icons.phone_outlined,
-      validator: (v) => v!.length < 10 ? "Enter valid mobile" : null,
-    ),
-    const SizedBox(height: 10),
-
-    // ⭐ PREMIUM OTP BUTTON
-    Align(
-      alignment: Alignment.centerRight,
-      child: TextButton(
-        onPressed: (_resendSeconds > 0 || _isSendingOtp)
-            ? null
-            : () async {
-                if (mobileController.text.length < 10) {
-                  Get.snackbar(
-                    "Error",
-                    "Enter valid mobile number",
-                    colorText: Colors.white,
-                    backgroundColor: Colors.red,
-                  );
-                  return;
-                }
-
-                setState(() => _isSendingOtp = true);
-
-                await _auth.verifyPhoneNumber(
-                  phoneNumber: "+91${mobileController.text.trim()}",
-                  verificationCompleted:
-                      (PhoneAuthCredential credential) async {
-                        await _auth.signInWithCredential(credential);
-                      },
-                  verificationFailed: (FirebaseAuthException e) {
-                    setState(() => _isSendingOtp = false);
-                    Get.snackbar(
-                      "OTP Failed",
-                      e.message ?? "Verification failed",
-                      colorText: Colors.white,
-                      backgroundColor: Colors.red,
-                    );
-                  },
-                  codeSent: (String verificationId, int? resendToken) {
-                    _verificationId = verificationId;
-                    _startOtpTimer();
-                    setState(() => _isSendingOtp = false);
-                    Get.snackbar(
-                      "OTP Sent",
-                      "Check your mobile for OTP",
-                      colorText: Colors.white,
-                      backgroundColor: Colors.green,
-                    );
-                  },
-                  codeAutoRetrievalTimeout: (String verificationId) {
-                    _verificationId = verificationId;
-                  },
-                );
-              },
-        child: Text(
-          _isSendingOtp
-              ? "Sending..."
-              : (_resendSeconds > 0
-                    ? "Resend in ${_resendSeconds}s"
-                    : "Send OTP"),
-          style: TextStyle(color: theme.colorScheme.primary),
-        ),
-      ),
-    ),
-
-    const SizedBox(height: 16),
-
-    _field(
-      controller: otpController,
-      hint: "OTP",
-      icon: Icons.lock_clock_outlined,
-      validator: (v) => v!.isEmpty ? "Enter OTP" : null,
-    ),
-  ];
-
-  // ================= TOGGLE =================
-
-  Widget _toggle(ThemeData theme, String text, int value) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _signupMethod = value),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: _signupMethod == value
-                ? theme.colorScheme.primary
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Center(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: _signupMethod == value ? Colors.black : Colors.white70,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ================= FIELD =================
 
   Widget _field({
     required TextEditingController controller,
