@@ -1,0 +1,27 @@
+
+{
+  "appTitle": "Salah Modu",
+  "welcome": "Hoş geldiniz",
+  "supporttheapp": "Uygulamayı destekle",
+  "login": "Giriş yap",
+  "signup": "Kayıt ol",
+  "skip": "Atla",
+  "email": "E-posta",
+  "password": "Şifre",
+  "confirmPassword": "Şifreyi onayla",
+  "forgotPassword": "Şifrenizi mi unuttunuz?",
+  "continueWithGoogle": "Google ile devam et",
+  "language": "Dil",
+  "theme": "Tema",
+  "prayersDone": "Tamamlanan Namazlar",
+  "streak": "Seri",
+  "quranRead": "Okunan Kur'an",
+  "madhab": "Mezhep",
+  "shareApp": "Uygulamayı Paylaş",
+  "rateUs": "Bizi Değerlendir",
+  "contactUs": "Bize Ulaşın",
+  "aboutUs": "Hakkımızda",
+  "logout": "Çıkış Yap",
+  "stay": "Kal",
+  "leaveSalahMode": "Salah Mode'dan çıkmak istiyor musunuz?"
+}

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LanguageScreen extends StatefulWidget {
   const LanguageScreen({super.key});
@@ -8,70 +10,114 @@ class LanguageScreen extends StatefulWidget {
 }
 
 class _LanguageScreenState extends State<LanguageScreen> {
-  String _selectedLanguage = "English";
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguage();
+  }
+
+  Future<void> _loadLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('language_code');
+
+    if (saved != null) {
+      setState(() => _selectedLanguageCode = saved);
+      Get.updateLocale(Locale(saved));
+    }
+  }
+
+  Future<void> _saveLanguage(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString('language_code', code);
+
+    setState(() {
+      _selectedLanguageCode = code;
+    });
+
+    Get.updateLocale(Locale(code));
+  }
+
+  String _selectedLanguageCode = "en";
 
   final List<Map<String, String>> _languages = const [
-    {"name": "English", "native": "English"},
-    {"name": "Urdu", "native": "اردو"},
-    {"name": "Hindi", "native": "हिन्दी"},
-    {"name": "Arabic", "native": "العربية"},
+    {"name": "English", "native": "English", "code": "en"},
+    {"name": "Urdu", "native": "اردو", "code": "ur"},
+    {"name": "Hindi", "native": "हिन्दी", "code": "hi"},
+    {"name": "Spanish", "native": "Español", "code": "es"},
+    {"name": "Indonesian", "native": "Bahasa Indonesia", "code": "id"},
+    {"name": "Turkish", "native": "Türkçe", "code": "tr"},
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Theme.of(context).colorScheme.onBackground,
-        centerTitle: true,
-        title: Text(
-          "Language",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onBackground,
-          ),
+    final theme = Theme.of(context);
+    return Container(
+      height: Get.height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.tertiary,
+            theme.colorScheme.background,
+            theme.colorScheme.onBackground,
+          ],
+
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Choose your preferred language",
-              style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onBackground.withOpacity(.7),
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView.separated(
-                itemCount: _languages.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final lang = _languages[index];
-                  final isSelected = _selectedLanguage == lang["name"];
-
-                  return _languageTile(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          centerTitle: true,
+          title: Text(
+            "Language",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Choose your preferred language",
+                style: TextStyle(
+                  color: Theme.of(
                     context,
-                    title: lang["name"]!,
-                    native: lang["native"]!,
-                    selected: isSelected,
-                    onTap: () {
-                      setState(() {
-                        _selectedLanguage = lang["name"]!;
-                      });
-                    },
-                  );
-                },
+                  ).colorScheme.onSurface.withOpacity(.75),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: .3,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _languages.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final lang = _languages[index];
+                    final isSelected = _selectedLanguageCode == lang["code"];
+
+                    return _languageTile(
+                      context,
+                      title: lang["name"]!,
+                      native: lang["native"]!,
+                      selected: isSelected,
+                      onTap: () {
+                        final code = lang["code"]!;
+                        _saveLanguage(code);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -90,33 +136,32 @@ class _LanguageScreenState extends State<LanguageScreen> {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.primary.withOpacity(.18)
-              : Theme.of(context).colorScheme.surface.withOpacity(.6),
+          gradient: selected
+              ? LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary.withOpacity(.18),
+                    Theme.of(context).colorScheme.primary.withOpacity(.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: selected ? null : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
                 ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).dividerColor.withOpacity(.4),
+                : Theme.of(context).colorScheme.outline.withOpacity(.3),
             width: selected ? 1.6 : 1,
           ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(.25),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : [],
         ),
         child: Row(
           children: [
             Icon(
               Icons.language,
-              color: Theme.of(context).colorScheme.onBackground.withOpacity(.7),
+              color: selected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface.withOpacity(.7),
               size: 26,
             ),
             const SizedBox(width: 14),
@@ -127,8 +172,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                   Text(
                     title,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onBackground,
                       fontSize: 16,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -136,10 +181,10 @@ class _LanguageScreenState extends State<LanguageScreen> {
                   Text(
                     native,
                     style: TextStyle(
+                      fontSize: 13,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onBackground.withOpacity(.6),
-                      fontSize: 13,
+                      ).colorScheme.onSurface.withOpacity(.65),
                     ),
                   ),
                 ],

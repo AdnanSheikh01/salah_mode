@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "526394807998",
-    "project_id": "salah-mode-c3142",
-    "storage_bucket": "salah-mode-c3142.firebasestorage.app"
+    "project_number": "134292095717",
+    "project_id": "salah-mode-66d19",
+    "storage_bucket": "salah-mode-66d19.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:526394807998:android:fdfccf508b8c1fbb8b70ef",
+        "mobilesdk_app_id": "1:134292095717:android:b340edda7de4e546c14a0c",
         "android_client_info": {
-          "package_name": "com.example.salah_mode"
+          "package_name": "com.adnan.dev.salahmode"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "134292095717-a2gjqheghttufeuoepk72vb4i6npk3rg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.adnan.dev.salahmode",
+            "certificate_hash": "0db42c920c06b1f550d9c74110f9421b675e8f82"
+          }
+        },
+        {
+          "client_id": "134292095717-3jicmfa47m9ere4jifa7l0jao75r0e91.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDrOET_S_PGBsMZQoj-Ykei221lDmB94ck"
+          "current_key": "AIzaSyBdIX9C9XtlmNbBxhfOPLmJXDRlDbBsNDE"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "134292095717-3jicmfa47m9ere4jifa7l0jao75r0e91.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

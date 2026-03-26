@@ -1,0 +1,223 @@
+final List<Map<String, String>> childrenDuas = [
+  {
+    "name": "Dua for Righteous Children",
+    "when": "When desiring pious offspring",
+    "arabic": "رَبِّ هَبْ لِي مِنَ الصَّالِحِينَ",
+    "english": "Rabbi hab li minas-salihin",
+    "translation": "My Lord, grant me [a child] from among the righteous.",
+    "reference": "Quran",
+    "refNo": "37:100",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Good Offspring",
+    "when": "General dua for children",
+    "arabic":
+        "رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ وَمِنْ ذُرِّيَّتِي رَبَّنَا وَتَقَبَّلْ دُعَاءِ",
+    "english":
+        "Rabbi ij'alni muqimas-salati wa min dhurriyyati Rabbana wa taqabbal du'a",
+    "translation":
+        "My Lord, make me an establisher of prayer, and many from my descendants. Our Lord, accept my supplication.",
+    "reference": "Quran",
+    "refNo": "14:40",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Protection of Children",
+    "when": "For protection from evil eye and harm",
+    "arabic":
+        "أُعِيذُكُمَا بِكَلِمَاتِ اللَّهِ التَّامَّةِ مِنْ كُلِّ شَيْطَانٍ وَهَامَّةٍ وَمِنْ كُلِّ عَيْنٍ لَامَّةٍ",
+    "english":
+        "U'idhukuma bikalimatillahit-tammati min kulli shaytanin wa hammatin wa min kulli 'aynin lammah",
+    "translation":
+        "I seek protection for you in the perfect words of Allah from every devil, poisonous creature and every evil eye.",
+    "reference": "Bukhari",
+    "refNo": "3371",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Gratitude for Children",
+    "when": "Thanking Allah for blessing of children",
+    "arabic":
+        "رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ الَّتِي أَنْعَمْتَ عَلَيَّ وَعَلَىٰ وَالِدَيَّ",
+    "english":
+        "Rabbi awzi'ni an ashkura ni'mataka allati an'amta 'alayya wa 'ala walidayya",
+    "translation":
+        "My Lord, enable me to be grateful for Your favor which You have bestowed upon me and upon my parents.",
+    "reference": "Quran",
+    "refNo": "27:19",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Family Righteousness",
+    "when": "For spouse and children guidance",
+    "arabic":
+        "رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ وَاجْعَلْنَا لِلْمُتَّقِينَ إِمَامًا",
+    "english":
+        "Rabbana hab lana min azwajina wa dhurriyyatina qurrata a'yun waj'alna lil-muttaqina imama",
+    "translation":
+        "Our Lord, grant us from our spouses and offspring comfort to our eyes and make us leaders for the righteous.",
+    "reference": "Quran",
+    "refNo": "25:74",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Child's Guidance",
+    "when": "When worried about child’s future",
+    "arabic": "اللَّهُمَّ اهْدِهِمْ وَأَصْلِحْهُمْ",
+    "english": "Allahumma ihdihim wa aslihhhum",
+    "translation": "O Allah guide them and rectify them.",
+    "reference": "Ahmad",
+    "refNo": "15498",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Child’s Protection from Shaytan",
+    "when": "Before intimacy / pregnancy dua",
+    "arabic": "بِسْمِ اللَّهِ اللَّهُمَّ جَنِّبْنَا الشَّيْطَانَ",
+    "english":
+        "Bismillah, Allahumma jannibnash-shaytana wa jannibish-shaytana ma razaqtana",
+    "translation": "In the name of Allah, O Allah keep Shaytan away from us.",
+    "reference": "Bukhari",
+    "refNo": "5165",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Child’s Knowledge",
+    "when": "For child’s education and deen",
+    "arabic": "اللَّهُمَّ انْفَعْهُمْ بِالْعِلْمِ",
+    "english": "Allahumma anfi'hum bil-'ilm",
+    "translation": "O Allah benefit them with knowledge.",
+    "reference": "Tirmidhi",
+    "refNo": "2682",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Child’s Good Character",
+    "when": "For manners and akhlaq",
+    "arabic": "اللَّهُمَّ حَسِّنْ أَخْلَاقَهُمْ",
+    "english": "Allahumma hassin akhlaqahum",
+    "translation": "O Allah make their character beautiful.",
+    "reference": "Ahmad",
+    "refNo": "24601",
+    "category": "Children",
+  },
+  {
+    "name": "Dua for Child’s Success",
+    "when": "For dunya and akhirah success",
+    "arabic": "اللَّهُمَّ وَفِّقْهُمْ لِمَا تُحِبُّ",
+    "english": "Allahumma waffiqhum lima tuhibb",
+    "translation": "O Allah grant them success in what You love.",
+    "reference": "Muslim Supplication",
+    "refNo": "-",
+    "category": "Children",
+  },
+  {
+    "name": "Newborn Barakah Dua",
+    "when": "When congratulating someone on newborn",
+    "arabic":
+        "بَارَكَ اللَّهُ لَكَ فِي الْمَوْهُوبِ لَكَ وَشَكَرْتَ الْوَاهِبَ وَبَلَغَ أَشُدَّهُ وَرُزِقْتَ بِرَّهُ",
+    "english":
+        "Barakallahu laka fil‑mawhubi laka wa shakartal‑Wahib wa balagha ashuddahu wa ruziqta birrah",
+    "translation":
+        "May Allah bless you in the gift He granted you, may you thank the Giver, may the child reach maturity and be righteous to you.",
+    "reference": "Hisnul Muslim",
+    "refNo": "Islamic Etiquette",
+    "category": "Children",
+  },
+  {
+    "name": "Adhan in Newborn Ear",
+    "when": "After child birth",
+    "arabic":
+        "أَنَّ النَّبِيَّ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ أَذَّنَ فِي أُذُنِ الْحَسَنِ بْنِ عَلِيٍّ حِينَ وَلَدَتْهُ فَاطِمَةُ",
+    "english":
+        "The Prophet ﷺ pronounced the Adhan in the ear of Hasan when he was born.",
+    "translation": "It is Sunnah to pronounce Adhan in the newborn’s ear.",
+    "reference": "Abu Dawood",
+    "refNo": "5105",
+    "category": "Children",
+  },
+  {
+    "name": "Tahneek Sunnah",
+    "when": "After birth ritual",
+    "arabic": "فَحَنَّكَهُ بِتَمْرَةٍ",
+    "english": "He performed Tahneek with a date.",
+    "translation":
+        "The Prophet ﷺ softened a date and rubbed it in the newborn’s mouth.",
+    "reference": "Bukhari",
+    "refNo": "5467",
+    "category": "Children",
+  },
+  {
+    "name": "Ruqyah Protection",
+    "when": "For child illness or fear",
+    "arabic": "أَذْهِبِ الْبَاسَ رَبَّ النَّاسِ اشْفِ أَنْتَ الشَّافِي",
+    "english": "Adh‑hibil ba'sa Rabb‑an‑nas ishfi anta ash‑Shafi",
+    "translation":
+        "Remove the harm, Lord of mankind, cure (him), You are the Healer.",
+    "reference": "Bukhari",
+    "refNo": "5743",
+    "category": "Children",
+  },
+  {
+    "name": "Morning Protection Adhkar",
+    "when": "Daily protection for children",
+    "arabic": "بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ",
+    "english": "Bismillahil‑ladhi la yadurru ma'asmihi shay'",
+    "translation": "In the name of Allah with whose name nothing can harm.",
+    "reference": "Tirmidhi",
+    "refNo": "3388",
+    "category": "Children",
+  },
+  {
+    "name": "Evening Protection Adhkar",
+    "when": "Before sleep",
+    "arabic": "أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ",
+    "english": "A'udhu bikalimatillahit‑tammati min sharri ma khalaq",
+    "translation":
+        "I seek refuge in the perfect words of Allah from the evil of what He created.",
+    "reference": "Muslim",
+    "refNo": "2708",
+    "category": "Children",
+  },
+  {
+    "name": "Surah Ikhlas Protection",
+    "when": "For ruqyah and safety",
+    "arabic": "قُلْ هُوَ اللَّهُ أَحَدٌ",
+    "english": "Qul huwaAllahu ahad",
+    "translation": "Say: He is Allah, the One.",
+    "reference": "Bukhari",
+    "refNo": "5017",
+    "category": "Children",
+  },
+  {
+    "name": "Surah Falaq Protection",
+    "when": "For protection from harm",
+    "arabic": "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
+    "english": "Qul a'udhu bi Rabbil‑falaq",
+    "translation": "Say: I seek refuge in the Lord of daybreak.",
+    "reference": "Bukhari",
+    "refNo": "5017",
+    "category": "Children",
+  },
+  {
+    "name": "Surah Nas Protection",
+    "when": "For evil whispers",
+    "arabic": "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
+    "english": "Qul a'udhu bi Rabbin‑nas",
+    "translation": "Say: I seek refuge in the Lord of mankind.",
+    "reference": "Bukhari",
+    "refNo": "5017",
+    "category": "Children",
+  },
+  {
+    "name": "General Dua for Child Blessing",
+    "when": "Anytime",
+    "arabic": "اللَّهُمَّ بَارِكْ فِيهِ وَاجْعَلْهُ مِنَ الصَّالِحِينَ",
+    "english": "Allahumma barik fihi waj'alhu minas‑salihin",
+    "translation": "O Allah bless him and make him among the righteous.",
+    "reference": "General Sunnah Dua",
+    "refNo": "-",
+    "category": "Children",
+  },
+];

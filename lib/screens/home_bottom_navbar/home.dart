@@ -1,19 +1,20 @@
 import 'package:adhan/adhan.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For haptics
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:salah_mode/screens/utils/theme_data.dart';
+import 'package:salah_mode/screens/widgets/prohibited_times.dart';
 import 'dart:convert';
-
-// Assuming these are your local imports
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:salah_mode/screens/widgets/daily_ayah.dart';
-import 'package:salah_mode/screens/widgets/next_prayer_card.dart';
+import 'package:salah_mode/screens/widgets/prayer_card.dart';
 import 'package:salah_mode/screens/widgets/prayer_lock.dart';
 import 'package:salah_mode/screens/widgets/salam_header.dart';
+import 'package:salah_mode/screens/widgets/prayer_time_services.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,22 +24,35 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage>
-    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
-  // State variables
+    with
+        AutomaticKeepAliveClientMixin,
+        WidgetsBindingObserver,
+        TickerProviderStateMixin {
+  // ── State ──────────────────────────────────────────────────────
   bool prayerLockEnabled = false;
   int lockMinutes = 15;
+
   DateTime _nextPrayerTime = DateTime.now();
   String _nextPrayerName = '';
   PrayerTimes? _prayerTimes;
   Duration _remaining = Duration.zero;
-  Timer? _timer;
-  final AudioPlayer _adhanPlayer = AudioPlayer();
   String _cityName = 'Loading...';
+
+  final AudioPlayer _adhanPlayer = AudioPlayer();
+  late PrayerTimeService _prayerService;
+
+  late DateTime sunriseStart;
+  late DateTime sunriseEnd;
+  late DateTime sunsetStart;
+  late DateTime zawalStart;
+  late DateTime maghribStart;
+  late DateTime dhuhrTime;
 
   String _ayahText = '';
   String _ayahRef = '';
   bool _ayahLoading = true;
-  bool _isLocating = false;
+
+  String _fmt(DateTime t) => DateFormat.jm().format(t.toLocal());
 
   final Map<String, bool> _prayerTicks = {
     'Fajr': false,
@@ -51,103 +65,60 @@ class _HomePageState extends State<HomePage>
   @override
   bool get wantKeepAlive => true;
 
+  // ── Lifecycle ──────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initSequence();
-    _loadDailyAyah();
-  }
 
-  // --- Optimized Logic ---
-
-  Future<void> _initSequence() async {
-    // 1. Check Permissions
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    // 2. Immediate Load (Fastest)
-    Position? lastPos = await Geolocator.getLastKnownPosition();
-    if (lastPos != null) {
-      _calculatePrayers(lastPos);
-    }
-
-    // 3. Precise Update (Background)
-    _updateLocationSilently();
-  }
-
-  Future<void> _updateLocationSilently() async {
-    setState(() => _isLocating = true);
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.low, // Lower accuracy = much faster
-        timeLimit: const Duration(seconds: 5),
-      );
-      _calculatePrayers(position);
-      _loadCityName(position.latitude, position.longitude);
-    } catch (e) {
-      debugPrint("Silent location update failed: $e");
-    } finally {
-      if (mounted) setState(() => _isLocating = false);
-    }
-  }
-
-  void _calculatePrayers(Position pos) {
-    final coordinates = Coordinates(pos.latitude, pos.longitude);
-    final params = CalculationMethod.karachi.getParameters();
-    params.madhab = Madhab.hanafi;
-
-    final prayerTimes = PrayerTimes(
-      coordinates,
-      DateComponents.from(DateTime.now()),
-      params,
+    _prayerService = PrayerTimeService(
+      onUpdate: () {
+        if (!mounted) return;
+        setState(() {
+          _prayerTimes = _prayerService.prayerTimes;
+          _nextPrayerName = _prayerService.nextPrayerName;
+          _nextPrayerTime = _prayerService.nextPrayerTime;
+          _remaining = _prayerService.remaining;
+          _cityName = _prayerService.cityName;
+          sunriseStart = _prayerTimes!.sunrise;
+          sunriseEnd = sunriseStart.add(const Duration(minutes: 15));
+          dhuhrTime = _prayerTimes!.dhuhr;
+          zawalStart = dhuhrTime.subtract(const Duration(minutes: 10));
+          maghribStart = _prayerTimes!.maghrib;
+          sunsetStart = maghribStart.subtract(const Duration(minutes: 15));
+        });
+      },
     );
 
-    if (mounted) {
-      setState(() {
-        _prayerTimes = prayerTimes;
-        _updateNextPrayer();
-      });
-    }
+    _prayerService.init();
+    _loadDailyAyah();
+    _loadPrayerTicks();
   }
 
-  void _updateNextPrayer() {
-    if (_prayerTimes == null) return;
-    final next = _prayerTimes!.nextPrayer();
-
-    // Logic for after Isha (tomorrow's Fajr)
-    if (next == Prayer.none) {
-      _nextPrayerName = "FAJR";
-      _nextPrayerTime = _prayerTimes!.fajr.add(const Duration(days: 1));
-    } else {
-      _nextPrayerName = next.name.toUpperCase();
-      _nextPrayerTime = _prayerTimes!.timeForPrayer(next)!;
-    }
-    _startCountdown();
+  @override
+  void dispose() {
+    _adhanPlayer.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _prayerService.dispose();
+    super.dispose();
   }
 
-  void _startCountdown() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      final diff = _nextPrayerTime.difference(DateTime.now());
-      if (diff.inSeconds <= 0) {
-        _updateLocationSilently(); // Refresh when time hits zero
-      } else {
-        setState(() => _remaining = diff);
+  // ── Data helpers ───────────────────────────────────────────────
+  final _userName = FirebaseAuth.instance.currentUser?.displayName;
+
+  Future<void> _loadPrayerTicks() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      for (final key in _prayerTicks.keys) {
+        _prayerTicks[key] = prefs.getBool('tick_$key') ?? false;
       }
     });
   }
 
-  Future<void> _loadCityName(double lat, double lng) async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
-      if (placemarks.isNotEmpty && mounted) {
-        setState(() => _cityName = placemarks.first.locality ?? "Unknown");
-      }
-    } catch (_) {}
+  Future<void> _savePrayerTick(String name, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tick_$name', value);
   }
 
   Future<void> _loadDailyAyah() async {
@@ -167,30 +138,100 @@ class _HomePageState extends State<HomePage>
     } catch (_) {}
   }
 
+  void _checkAllPrayersCompleted() {
+    if (!_prayerTicks.values.every((v) => v)) return;
+    if (!mounted) return;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = isDark
+        ? AppTheme.darkAccentGreen
+        : AppTheme.lightAccent;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "MashaAllah! All prayers completed today 🤲",
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: isDark
+                ? AppTheme.darkTextPrimary
+                : AppTheme.lightTextOnAccent,
+          ),
+        ),
+        backgroundColor: accentColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final theme = Theme.of(context);
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = isDark ? AppTheme.darkAccent : AppTheme.lightAccent;
+    final bgColor = isDark ? AppTheme.darkMainBg : AppTheme.lightMainBg;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: RefreshIndicator(
-          color: theme.colorScheme.primary,
-          onRefresh: () => _updateLocationSilently(),
+          color: accentColor,
+          backgroundColor: isDark ? AppTheme.darkCard : AppTheme.lightCard,
+          onRefresh: () async {
+            try {
+              await _prayerService.updateLocationSilently().timeout(
+                const Duration(seconds: 10),
+              );
+            } catch (_) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    "Location taking too long. Showing last known prayer times.",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      color: isDark
+                          ? AppTheme.darkTextPrimary
+                          : AppTheme.lightTextPrimary,
+                    ),
+                  ),
+                  backgroundColor: isDark
+                      ? AppTheme.darkCardAlt
+                      : AppTheme.lightCardAlt,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  margin: const EdgeInsets.all(16),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
           child: ListView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
               const SizedBox(height: 10),
-              salamHeader(context),
 
-              const SizedBox(height: 25),
+              // ── Greeting header ────────────────────────────────
+              salamHeader(context, _userName ?? ""),
 
+              const SizedBox(height: 24),
+
+              // ── Skeleton or live content ───────────────────────
               if (_prayerTimes == null)
-                _buildSkeletonLoader()
+                _buildSkeletonLoader(isDark)
               else ...[
-                premiumNextPrayerHeader(
+                prayerCard(
                   context,
                   _nextPrayerTime,
                   _remaining,
@@ -199,10 +240,15 @@ class _HomePageState extends State<HomePage>
                   _prayerTimes!,
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // Professional Section Title
-                _sectionHeader("UTILITIES", Icons.auto_awesome),
+                _sectionHeader(
+                  context,
+                  "UTILITIES",
+                  Icons.auto_awesome_rounded,
+                  isDark,
+                ),
+
                 prayerLockCard(
                   context,
                   prayerLockEnabled,
@@ -211,29 +257,46 @@ class _HomePageState extends State<HomePage>
                   (m) => setState(() => lockMinutes = m),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                _sectionHeader("DAILY TRACKER", Icons.event_available_rounded),
-                prayerTickCard(context, _prayerTicks, (name, value) {
+                _sectionHeader(
+                  context,
+                  "DAILY TRACKER",
+                  Icons.event_available_rounded,
+                  isDark,
+                ),
+
+                prayerTickCard(context, _prayerTicks, _prayerTimes!, (
+                  name,
+                  value,
+                ) async {
                   HapticFeedback.lightImpact();
                   setState(() => _prayerTicks[name] = value);
+                  await _savePrayerTick(name, value);
                   if (value) _checkAllPrayersCompleted();
                 }),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                prohibitedTimeCard(context, _prayerTimes!),
+                prohibitedTimeCard(
+                  context,
+                  _prayerTimes!,
+                  "${_fmt(sunriseStart)} - ${_fmt(sunriseEnd)}",
+                  "${_fmt(zawalStart)} - ${_fmt(dhuhrTime)}",
+                  "${_fmt(sunsetStart)} - ${_fmt(maghribStart)}",
+                ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 dailyAyah(
                   context,
-                  () => _loadDailyAyah(),
+                  _loadDailyAyah,
                   _ayahLoading,
                   _ayahText,
                   _ayahRef,
                 ),
-                const SizedBox(height: 30),
+
+                const SizedBox(height: 32),
               ],
             ],
           ),
@@ -242,20 +305,31 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _sectionHeader(String title, IconData icon) {
+  // ── Section header ─────────────────────────────────────────────
+  Widget _sectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon,
+    bool isDark,
+  ) {
+    final color = isDark
+        ? AppTheme.darkTextTertiary
+        : AppTheme.lightTextTertiary;
+
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 12),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: Colors.white38),
-          const SizedBox(width: 8),
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 7),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white38,
+            style: TextStyle(
+              fontFamily: 'Poppins',
               fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 1.8,
             ),
           ),
         ],
@@ -263,232 +337,262 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildSkeletonLoader() {
+  // ── Skeleton loader ────────────────────────────────────────────
+  Widget _buildSkeletonLoader(bool isDark) {
     return Container(
       height: 200,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(24),
+        color: isDark ? AppTheme.darkCard : AppTheme.lightCardAlt,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+          width: 0.8,
+        ),
       ),
-      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      child: Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: isDark ? AppTheme.darkAccent : AppTheme.lightAccent,
+          backgroundColor: (isDark ? AppTheme.darkAccent : AppTheme.lightAccent)
+              .withOpacity(0.15),
+        ),
+      ),
     );
   }
-
-  void _checkAllPrayersCompleted() {
-    if (_prayerTicks.values.every((v) => v)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("MashaAllah! All prayers done."),
-          backgroundColor: Colors.green.shade800,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _adhanPlayer.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
 }
 
-// --- Modified Professional Prohibited Card ---
-
-Widget prohibitedTimeCard(BuildContext context, PrayerTimes prayerTimes) {
-  final theme = Theme.of(context);
-
-  // Logic for ranges
-  final sunriseStart = prayerTimes.sunrise;
-  final sunriseEnd = sunriseStart.add(const Duration(minutes: 15));
-  final dhuhrTime = prayerTimes.dhuhr;
-  final zawalStart = dhuhrTime.subtract(const Duration(minutes: 10));
-  final maghribStart = prayerTimes.maghrib;
-  final sunsetStart = maghribStart.subtract(const Duration(minutes: 15));
-
-  String format(DateTime t) => DateFormat.jm().format(t.toLocal());
-
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1A1A1A),
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: Colors.white.withOpacity(0.05)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              "Forbidden Times",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                "MAKRUH",
-                style: TextStyle(
-                  color: Colors.redAccent,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _prohibitedRow(
-          "Sunrise (Shuruq)",
-          "${format(sunriseStart)} - ${format(sunriseEnd)}",
-        ),
-        _prohibitedRow(
-          "Midday (Zawal)",
-          "${format(zawalStart)} - ${format(dhuhrTime)}",
-        ),
-        _prohibitedRow(
-          "Sunset (Ghurub)",
-          "${format(sunsetStart)} - ${format(maghribStart)}",
-        ),
-
-        const SizedBox(height: 20),
-        const Divider(color: Colors.white10),
-        const SizedBox(height: 12),
-
-        // Full Hadith Text
-        Text(
-          "HADITH REFERENCE",
-          style: TextStyle(
-            color: theme.colorScheme.primary,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          "“There were three times at which the Messenger of Allah (ﷺ) forbade us to pray, or to bury our dead: When the sun begins to rise till it is fully up, when the sun is at its height at midday till it passes over the meridian, and when the sun draws near to setting till it sets.”",
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 12,
-            height: 1.5,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          "— Sahih Muslim 831",
-          style: TextStyle(color: Colors.white24, fontSize: 11),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _prohibitedRow(String label, String time) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Row(
-      children: [
-        const Icon(
-          Icons.history_toggle_off_rounded,
-          size: 18,
-          color: Colors.orangeAccent,
-        ),
-        const SizedBox(width: 12),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
-        ),
-        const Spacer(),
-        Text(
-          time,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
-      ],
-    ),
-  );
-}
+// ═══════════════════════════════════════════════════════════════════
+//  PRAYER TICK CARD
+// ═══════════════════════════════════════════════════════════════════
 
 Widget prayerTickCard(
   BuildContext context,
   Map<String, bool> ticks,
+  PrayerTimes prayerTimes,
   Function(String, bool) onChanged,
 ) {
-  final theme = Theme.of(context);
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final cardColor = isDark ? AppTheme.darkCard : AppTheme.lightCard;
+  final accentColor = isDark ? AppTheme.darkAccent : AppTheme.lightAccent;
+  final textPrimary = isDark
+      ? AppTheme.darkTextPrimary
+      : AppTheme.lightTextPrimary;
+  final textSecondary = isDark
+      ? AppTheme.darkTextSecondary
+      : AppTheme.lightTextSecondary;
+  final textTertiary = isDark
+      ? AppTheme.darkTextTertiary
+      : AppTheme.lightTextTertiary;
+  final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+
+  final now = DateTime.now();
+
+  // Completion count for the progress indicator
+  final completedCount = ticks.values.where((v) => v).length;
+  final totalCount = ticks.length;
 
   return Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFF1A1A1A), // Graphite/Obsidian base
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: Colors.white.withOpacity(0.05)),
+      color: cardColor,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: borderColor, width: 0.8),
     ),
     child: Column(
       children: [
+        // ── Progress bar ─────────────────────────────────────────
+        Row(
+          children: [
+            Text(
+              "$completedCount / $totalCount prayers",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: textSecondary,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              completedCount == totalCount ? "MashaAllah! ✦" : "Keep going",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: completedCount == totalCount
+                    ? accentColor
+                    : textTertiary,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        // Thin progress bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: completedCount / totalCount,
+            minHeight: 4,
+            backgroundColor: borderColor,
+            valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        Divider(color: borderColor, thickness: 0.8),
+
+        // ── Prayer rows ──────────────────────────────────────────
         ...ticks.keys.map((name) {
           final isDone = ticks[name] ?? false;
+
+          final DateTime prayerTime;
+          switch (name) {
+            case 'Fajr':
+              prayerTime = prayerTimes.fajr;
+              break;
+            case 'Dhuhr':
+              prayerTime = prayerTimes.dhuhr;
+              break;
+            case 'Asr':
+              prayerTime = prayerTimes.asr;
+              break;
+            case 'Maghrib':
+              prayerTime = prayerTimes.maghrib;
+              break;
+            case 'Isha':
+              prayerTime = prayerTimes.isha;
+              break;
+            default:
+              prayerTime = prayerTimes.fajr;
+          }
+
+          final canTick = now.isAfter(prayerTime);
+
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => onChanged(name, !isDone),
+            child: GestureDetector(
+              onTap: () {
+                if (canTick) {
+                  onChanged(name, !isDone);
+                } else {
+                  HapticFeedback.mediumImpact();
+                  if (!ScaffoldMessenger.of(context).mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "$name prayer starts at ${_formatPrayerTime(prayerTime)}",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          color: isDark
+                              ? AppTheme.darkTextPrimary
+                              : AppTheme.lightTextPrimary,
+                        ),
+                      ),
+                      backgroundColor: isDark
+                          ? AppTheme.darkCardAlt
+                          : AppTheme.lightCardAlt,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
+                  horizontal: 14,
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  // Slight glow when checked
+                  borderRadius: BorderRadius.circular(14),
                   color: isDone
-                      ? theme.colorScheme.primary.withOpacity(0.1)
+                      ? accentColor.withOpacity(0.08)
                       : Colors.transparent,
                   border: Border.all(
-                    color: isDone ? theme.colorScheme.primary : Colors.white10,
+                    color: isDone
+                        ? accentColor.withOpacity(0.30)
+                        : borderColor.withOpacity(0.5),
+                    width: 0.8,
                   ),
                 ),
                 child: Row(
                   children: [
-                    // Modern Icon Status
-                    Icon(
-                      isDone
-                          ? Icons.check_circle_rounded
-                          : Icons.panorama_fish_eye_rounded,
-                      color: isDone
-                          ? theme.colorScheme.primary
-                          : Colors.white24,
-                      size: 22,
+                    // Check icon
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        isDone
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        key: ValueKey(isDone),
+                        color: isDone
+                            ? accentColor
+                            : (canTick
+                                  ? textTertiary
+                                  : textTertiary.withOpacity(0.35)),
+                        size: 22,
+                      ),
                     ),
-                    const SizedBox(width: 14),
+
+                    const SizedBox(width: 12),
+
+                    // Prayer name
                     Text(
                       name,
                       style: TextStyle(
-                        color: isDone ? Colors.white : Colors.white70,
-                        fontWeight: isDone
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        fontSize: 15,
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        fontWeight: isDone ? FontWeight.w700 : FontWeight.w500,
+                        color: isDone ? textPrimary : textSecondary,
                       ),
                     ),
+
+                    // "Not yet" label for future prayers
+                    if (!canTick) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: borderColor.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          "upcoming",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 9,
+                            color: textTertiary,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+
                     const Spacer(),
-                    // Optional: Add prayer time here if you pass prayerTimes to this widget
+
+                    // Prayer time
+                    Text(
+                      _formatPrayerTime(prayerTime),
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isDone ? accentColor : textTertiary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -499,3 +603,5 @@ Widget prayerTickCard(
     ),
   );
 }
+
+String _formatPrayerTime(DateTime time) => DateFormat.jm().format(time);
